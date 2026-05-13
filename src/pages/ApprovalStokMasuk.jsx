@@ -9,6 +9,16 @@ export default function ApprovalStokMasuk() {
     { id: 'RCV-20260510-05', po: 'PO-2026-099', supplier: 'PT. PLI (Petronas)', date: '10 Mei 2026', items: 4, totalQty: 320, status: 'approved' },
   ]);
 
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('semua');
+
+  const filteredApprovals = approvals.filter(item => {
+    const matchSearch = item.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                        item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchStatus = filterStatus === 'semua' || item.status === filterStatus;
+    return matchSearch && matchStatus;
+  });
+
   const handleApprove = (id) => {
     setApprovals(approvals.map(a => a.id === id ? { ...a, status: 'approved' } : a));
   };
@@ -47,19 +57,28 @@ export default function ApprovalStokMasuk() {
             </div>
             <input 
               type="text" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari No Penerimaan atau Supplier..." 
               className="w-full pl-10 pr-4 py-2 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
             />
           </div>
           <div className="w-px h-8 bg-[#E2E8F0] hidden sm:block"></div>
-          <button className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#475569] hover:bg-[#F8FAFC] rounded-lg transition-colors">
-            <Filter className="w-4 h-4" /> Filter Status
-          </button>
+          <select 
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-[#475569] bg-white hover:bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg focus:outline-none transition-colors"
+          >
+            <option value="semua">Semua Status</option>
+            <option value="pending">Pending</option>
+            <option value="approved">Disetujui</option>
+            <option value="rejected">Ditolak</option>
+          </select>
         </div>
 
         {/* Data List */}
         <div className="flex flex-col gap-4">
-          {approvals.map((item, idx) => (
+          {filteredApprovals.map((item, idx) => (
             <div key={idx} className={`bg-white rounded-2xl shadow-sm border ${item.status === 'pending' ? 'border-[#E2E8F0] hover:border-[#CBD5E1]' : item.status === 'approved' ? 'border-[#BBF7D0] opacity-70' : 'border-[#FECACA] opacity-70'} overflow-hidden transition-all duration-300`}>
               <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-6">
                 

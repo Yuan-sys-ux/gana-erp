@@ -279,7 +279,7 @@ export default function MasterSupplier() {
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-[#334155]">Telepon</label>
                   <input type="text" className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
-                    value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} required />
+                    value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value.replace(/[^0-9+]/g, '')})} required />
                 </div>
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-[#334155]">Email</label>

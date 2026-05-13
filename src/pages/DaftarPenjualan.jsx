@@ -1,14 +1,46 @@
+import { useState, useMemo } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, FileText, CheckCircle2, Clock, XCircle, ChevronDown, Download, Eye } from 'lucide-react';
 
 export default function DaftarPenjualan() {
-  const salesOrders = [
+  const [salesOrders, setSalesOrders] = useState([
     { id: 'SO-20260511-001', date: '11 Mei 2026', customer: 'Berkah Sekawan Motor', sales: 'Fernando', total: 4200000, status: 'Draft' },
     { id: 'SO-20260511-002', date: '11 Mei 2026', customer: 'Jaya Motor Banjarmasin', sales: 'Budi Sales', total: 8500000, status: 'Approved' },
     { id: 'SO-20260510-015', date: '10 Mei 2026', customer: 'Mandiri Service', sales: 'Fernando', total: 12400000, status: 'Shipped' },
     { id: 'SO-20260510-016', date: '10 Mei 2026', customer: 'Abadi Motor', sales: 'Budi Sales', total: 3200000, status: 'Invoiced' },
     { id: 'SO-20260509-022', date: '09 Mei 2026', customer: 'Mitra Jaya Motor', sales: 'Fernando', total: 5600000, status: 'Cancelled' },
-  ];
+  ]);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState('Semua Status');
+
+  const filteredOrders = useMemo(() => {
+    return salesOrders.filter(so => {
+      const matchSearch = so.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          so.customer.toLowerCase().includes(searchTerm.toLowerCase());
+      const matchStatus = statusFilter === 'Semua Status' || so.status === statusFilter;
+      return matchSearch && matchStatus;
+    });
+  }, [salesOrders, searchTerm, statusFilter]);
+
+  const handleExportCSV = () => {
+    if (filteredOrders.length === 0) return alert("Tidak ada data untuk dieksport");
+    
+    const headers = ["NO SO,TANGGAL,PELANGGAN,SALES,TOTAL,STATUS"];
+    const csvRows = filteredOrders.map(row => {
+      return `${row.id},${row.date},"${row.customer}",${row.sales},${row.total},${row.status}`;
+    });
+    
+    const csvString = [headers, ...csvRows].join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `Data_Penjualan_${new Date().getTime()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
 
   const getStatusBadge = (status) => {
     switch(status) {
@@ -31,7 +63,10 @@ export default function DaftarPenjualan() {
             <h2 className="text-2xl font-bold text-[#1E293B]">Daftar Penjualan</h2>
             <p className="text-sm text-[#64748B] mt-1">Kelola seluruh transaksi Sales Order (SO)</p>
           </div>
-          <button className="bg-white border border-[#E2E8F0] text-[#475569] hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2">
+          <button 
+            onClick={handleExportCSV}
+            className="bg-white border border-[#E2E8F0] text-[#475569] hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+          >
             <Download className="w-4 h-4" /> Export CSV
           </button>
         </div>
@@ -44,6 +79,8 @@ export default function DaftarPenjualan() {
             </div>
             <input 
               type="text" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari No SO atau Nama Bengkel..." 
               className="w-full pl-10 pr-4 py-2.5 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
             />
@@ -55,12 +92,17 @@ export default function DaftarPenjualan() {
               <option>Bulan Ini</option>
               <option>Bulan Lalu</option>
             </select>
-            <select className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white flex-1 sm:w-[150px]">
-              <option>Semua Status</option>
-              <option>Draft</option>
-              <option>Approved</option>
-              <option>Shipped</option>
-              <option>Invoiced</option>
+            <select 
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white flex-1 sm:w-[150px]"
+            >
+              <option value="Semua Status">Semua Status</option>
+              <option value="Draft">Draft</option>
+              <option value="Approved">Approved</option>
+              <option value="Shipped">Shipped</option>
+              <option value="Invoiced">Invoiced</option>
+              <option value="Cancelled">Cancelled</option>
             </select>
           </div>
         </div>
@@ -81,7 +123,7 @@ export default function DaftarPenjualan() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {salesOrders.map((so, idx) => (
+                {filteredOrders.length > 0 ? filteredOrders.map((so, idx) => (
                   <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-6">
                       <div className="flex items-center gap-2">
@@ -104,7 +146,11 @@ export default function DaftarPenjualan() {
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan="7" className="py-8 text-center text-[#64748B]">Tidak ada data penjualan yang sesuai.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

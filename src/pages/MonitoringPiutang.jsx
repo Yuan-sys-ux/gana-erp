@@ -1,3 +1,4 @@
+import { useState, useMemo } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, AlertTriangle, CheckCircle2, Clock, Mail, Phone, DollarSign } from 'lucide-react';
 
@@ -9,6 +10,31 @@ export default function MonitoringPiutang() {
     { id: 'INV-2605-12', customer: 'Abadi Motor', city: 'Banjarmasin', amount: 5200000, dueDate: '01 Jun 2026', status: 'safe', days: 12 },
     { id: 'INV-2604-99', customer: 'Sejahtera Service', city: 'Banjarmasin', amount: 2100000, dueDate: '05 Mei 2026', status: 'overdue', days: 15 },
   ];
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('Semua Status');
+
+  const filteredPiutang = useMemo(() => {
+    return piutangList.filter(item => {
+      const matchSearch = item.customer.toLowerCase().includes(searchTerm.toLowerCase()) || 
+                          item.id.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      let matchStatus = true;
+      if (filterStatus === 'Overdue') matchStatus = item.status === 'overdue';
+      else if (filterStatus === 'Warning') matchStatus = item.status === 'warning';
+      else if (filterStatus === 'Aman') matchStatus = item.status === 'safe';
+
+      return matchSearch && matchStatus;
+    });
+  }, [searchTerm, filterStatus]);
+
+  const handleReminder = (type, customer) => {
+    if (type === 'phone') {
+      alert(`Membuka aplikasi Telepon/WhatsApp untuk menghubungi ${customer}...`);
+    } else {
+      alert(`Mengirim Email Reminder tagihan ke ${customer}...`);
+    }
+  };
 
   return (
     <DashboardLayout>
@@ -68,16 +94,22 @@ export default function MonitoringPiutang() {
             </div>
             <input 
               type="text" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari nama bengkel atau no invoice..." 
               className="w-full pl-10 pr-4 py-2.5 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
             />
           </div>
           <div className="w-px h-8 bg-[#E2E8F0] mx-2"></div>
-          <select className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white min-w-[150px] mr-2">
-            <option>Semua Status</option>
-            <option>Overdue</option>
-            <option>Warning</option>
-            <option>Aman</option>
+          <select 
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white min-w-[150px] mr-2"
+          >
+            <option value="Semua Status">Semua Status</option>
+            <option value="Overdue">Overdue</option>
+            <option value="Warning">Warning</option>
+            <option value="Aman">Aman</option>
           </select>
         </div>
 
@@ -96,7 +128,7 @@ export default function MonitoringPiutang() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {piutangList.map((item, idx) => (
+                {filteredPiutang.length > 0 ? filteredPiutang.map((item, idx) => (
                   <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-6">
                       <p className="font-bold text-[#1E293B]">{item.customer}</p>
@@ -133,16 +165,26 @@ export default function MonitoringPiutang() {
                     </td>
                     <td className="py-4 px-6">
                       <div className="flex items-center justify-center gap-2">
-                        <button className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors" title="Hubungi via Telepon">
+                        <button 
+                          onClick={() => handleReminder('phone', item.customer)}
+                          className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors" title="Hubungi via Telepon"
+                        >
                           <Phone className="w-4 h-4" />
                         </button>
-                        <button className="p-2 rounded-lg bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] transition-colors" title="Kirim Email Reminder">
+                        <button 
+                          onClick={() => handleReminder('email', item.customer)}
+                          className="p-2 rounded-lg bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] transition-colors" title="Kirim Email Reminder"
+                        >
                           <Mail className="w-4 h-4" />
                         </button>
                       </div>
                     </td>
                   </tr>
-                ))}
+                )) : (
+                  <tr>
+                    <td colSpan="6" className="py-8 text-center text-[#64748B]">Tidak ada data piutang yang sesuai.</td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>

@@ -1,8 +1,9 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 export default function PengirimanBarang() {
-  const deliveries = {
+  const [deliveries, setDeliveries] = useState({
     diproses: [
       { id: 'DO-20260511-001', customer: 'Berkah Sekawan Motor', qty: 15, address: 'Jl. A. Yani Km 5, Banjarmasin' },
       { id: 'DO-20260511-002', customer: 'Jaya Motor Banjarmasin', qty: 8, address: 'Jl. Lambung Mangkurat No. 45' },
@@ -14,6 +15,40 @@ export default function PengirimanBarang() {
       { id: 'DO-20260510-010', customer: 'Abadi Motor', qty: 12, address: 'Jl. Hasan Basri, Banjarmasin', time: '14:30 WITA' },
       { id: 'DO-20260509-022', customer: 'Sejahtera Service', qty: 30, address: 'Jl. Sutoyo S, Banjarmasin', time: '10:15 WITA' },
     ]
+  });
+
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filterBySearch = (arr) => arr.filter(item => 
+    item.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    item.customer.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const handleAssignDriver = (id) => {
+    const item = deliveries.diproses.find(d => d.id === id);
+    if (!item) return;
+    const driverName = prompt("Masukkan nama driver / plat nomor (Contoh: Pak Supri (DA 1234 XX)):");
+    if (!driverName) return;
+    
+    setDeliveries({
+      ...deliveries,
+      diproses: deliveries.diproses.filter(d => d.id !== id),
+      dikirim: [...deliveries.dikirim, { ...item, driver: driverName }]
+    });
+  };
+
+  const handleSelesaikanPengiriman = (id) => {
+    const item = deliveries.dikirim.find(d => d.id === id);
+    if (!item) return;
+    
+    const d = new Date();
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
+
+    setDeliveries({
+      ...deliveries,
+      dikirim: deliveries.dikirim.filter(d => d.id !== id),
+      terkirim: [{ ...item, time: timeStr }, ...deliveries.terkirim]
+    });
   };
 
   return (
@@ -39,6 +74,8 @@ export default function PengirimanBarang() {
             </div>
             <input 
               type="text" 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Cari No DO, nama pelanggan..." 
               className="w-full pl-10 pr-4 py-2 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
             />
@@ -59,8 +96,8 @@ export default function PengirimanBarang() {
             </div>
             
             <div className="flex flex-col gap-3">
-              {deliveries.diproses.map((item, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] cursor-grab hover:border-[#CBD5E1] transition-colors relative overflow-hidden">
+              {filterBySearch(deliveries.diproses).map((item, idx) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] hover:border-[#CBD5E1] transition-colors relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#94A3B8]"></div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
@@ -71,7 +108,10 @@ export default function PengirimanBarang() {
                     <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
                     <p className="text-xs leading-relaxed">{item.address}</p>
                   </div>
-                  <button className="mt-4 w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-bold rounded-lg transition-colors">
+                  <button 
+                    onClick={() => handleAssignDriver(item.id)}
+                    className="mt-4 w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-bold rounded-lg transition-colors"
+                  >
                     Assign Driver
                   </button>
                 </div>
@@ -90,8 +130,8 @@ export default function PengirimanBarang() {
             </div>
             
             <div className="flex flex-col gap-3">
-              {deliveries.dikirim.map((item, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-xl shadow-md border border-[#C7D2FE] relative overflow-hidden">
+              {filterBySearch(deliveries.dikirim).map((item, idx) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-md border border-[#C7D2FE] relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#4F46E5]"></div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
@@ -106,7 +146,10 @@ export default function PengirimanBarang() {
                     <div className="w-6 h-6 bg-[#E2E8F0] rounded-full flex items-center justify-center shrink-0">🚚</div>
                     <p className="text-xs font-semibold text-[#334155] truncate">{item.driver}</p>
                   </div>
-                  <button className="w-full py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold rounded-lg transition-colors">
+                  <button 
+                    onClick={() => handleSelesaikanPengiriman(item.id)}
+                    className="w-full py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold rounded-lg transition-colors"
+                  >
                     Selesaikan Pengiriman
                   </button>
                 </div>
@@ -125,8 +168,8 @@ export default function PengirimanBarang() {
             </div>
             
             <div className="flex flex-col gap-3">
-              {deliveries.terkirim.map((item, idx) => (
-                <div key={idx} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] relative overflow-hidden opacity-75 hover:opacity-100 transition-opacity">
+              {filterBySearch(deliveries.terkirim).map((item, idx) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] relative overflow-hidden opacity-75 hover:opacity-100 transition-opacity">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#16A34A]"></div>
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-xs font-bold text-[#16A34A] bg-[#DCFCE7] px-2 py-1 rounded">{item.id}</span>
