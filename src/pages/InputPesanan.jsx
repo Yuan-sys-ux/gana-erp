@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, ShoppingCart, Plus, Minus, Trash2 } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, Trash2, X } from 'lucide-react';
 
 export default function InputPesanan() {
   const allProducts = [
@@ -16,6 +16,25 @@ export default function InputPesanan() {
   const [activeFilter, setActiveFilter] = useState('Semua');
   const [cart, setCart] = useState([]);
   const [selectedBengkel, setSelectedBengkel] = useState('');
+  
+  // State for Bengkel List
+  const [bengkels, setBengkels] = useState([
+    "Berkah Sekawan Motor",
+    "Jaya Motor",
+    "Mandiri Service"
+  ]);
+  const [isAddBengkelOpen, setIsAddBengkelOpen] = useState(false);
+  const [newBengkelName, setNewBengkelName] = useState('');
+
+  const handleAddBengkel = (e) => {
+    e.preventDefault();
+    if(newBengkelName.trim()) {
+      setBengkels([...bengkels, newBengkelName]);
+      setSelectedBengkel(newBengkelName);
+      setNewBengkelName('');
+      setIsAddBengkelOpen(false);
+    }
+  };
 
   // Filtering Logic
   const filteredProducts = useMemo(() => {
@@ -80,17 +99,67 @@ export default function InputPesanan() {
           <label className="block text-xs font-bold text-[#1E293B] mb-2">
             Pilih Bengkel <span className="text-[#EF4444]">*</span>
           </label>
-          <select 
-            value={selectedBengkel}
-            onChange={(e) => setSelectedBengkel(e.target.value)}
-            className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#1E293B] focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
-          >
-            <option value="">-- Pilih Bengkel --</option>
-            <option value="Berkah Sekawan Motor">Berkah Sekawan Motor</option>
-            <option value="Jaya Motor">Jaya Motor</option>
-            <option value="Mandiri Service">Mandiri Service</option>
-          </select>
+          <div className="flex flex-col sm:flex-row gap-3">
+            <select 
+              value={selectedBengkel}
+              onChange={(e) => setSelectedBengkel(e.target.value)}
+              className="flex-1 border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#1E293B] focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+            >
+              <option value="">-- Pilih Bengkel --</option>
+              {bengkels.map((bengkel, idx) => (
+                <option key={idx} value={bengkel}>{bengkel}</option>
+              ))}
+            </select>
+            <button 
+              onClick={() => setIsAddBengkelOpen(true)}
+              className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#F1F5F9] text-[#4F46E5] rounded-lg font-bold text-sm hover:bg-[#E2E8F0] border border-[#CBD5E1] transition-colors whitespace-nowrap"
+            >
+              <Plus className="w-4 h-4" /> Bengkel Baru
+            </button>
+          </div>
         </div>
+
+        {/* Modal Tambah Bengkel */}
+        {isAddBengkelOpen && (
+          <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-xl shadow-xl w-full max-w-md overflow-hidden">
+              <div className="flex items-center justify-between p-5 border-b border-[#E2E8F0]">
+                <h3 className="font-bold text-[#1E293B]">Tambah Bengkel Baru</h3>
+                <button onClick={() => setIsAddBengkelOpen(false)} className="text-[#64748B] hover:text-[#1E293B]">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <form onSubmit={handleAddBengkel} className="p-5">
+                <div className="mb-5">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Bengkel <span className="text-[#EF4444]">*</span></label>
+                  <input 
+                    type="text" 
+                    required
+                    value={newBengkelName}
+                    onChange={(e) => setNewBengkelName(e.target.value)}
+                    placeholder="Masukkan nama bengkel..."
+                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                  />
+                </div>
+                <div className="flex justify-end gap-3">
+                  <button 
+                    type="button" 
+                    onClick={() => setIsAddBengkelOpen(false)}
+                    className="px-4 py-2 bg-white border border-[#CBD5E1] text-[#64748B] rounded-lg font-bold text-sm hover:bg-[#F8FAFC]"
+                  >
+                    Batal
+                  </button>
+                  <button 
+                    type="submit"
+                    className="px-4 py-2 bg-[#4F46E5] text-white rounded-lg font-bold text-sm hover:bg-[#4338CA]"
+                  >
+                    Simpan Bengkel
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
 
         <div className="flex flex-col lg:flex-row gap-6 items-start pb-10">
           
