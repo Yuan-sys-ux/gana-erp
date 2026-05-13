@@ -167,6 +167,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           <span>Logout</span>
         </button>
       </div>
+      </div>
     </>
   );
 }
