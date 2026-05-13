@@ -26,6 +26,10 @@ export default function InputPesanan() {
   const [isAddBengkelOpen, setIsAddBengkelOpen] = useState(false);
   const [newBengkelName, setNewBengkelName] = useState('');
 
+  // Payment State
+  const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' or 'tempo'
+  const [tempoDays, setTempoDays] = useState('14');
+
   const handleAddBengkel = (e) => {
     e.preventDefault();
     if(newBengkelName.trim()) {
@@ -80,9 +84,12 @@ export default function InputPesanan() {
       alert('Keranjang order masih kosong!');
       return;
     }
-    alert(`Pesanan berhasil dibuat untuk ${selectedBengkel}!\nTotal: Rp ${cartTotal.toLocaleString('id-ID')}`);
+    
+    let paymentInfo = paymentMethod === 'cash' ? 'Cash / Tunai' : `Tempo (${tempoDays} Hari)`;
+    alert(`Pesanan berhasil dibuat untuk ${selectedBengkel}!\nTotal: Rp ${cartTotal.toLocaleString('id-ID')}\nMetode Pembayaran: ${paymentInfo}`);
     setCart([]);
     setSelectedBengkel('');
+    setPaymentMethod('cash');
   };
 
   return (
@@ -282,11 +289,55 @@ export default function InputPesanan() {
 
             {/* Cart Footer */}
             {cart.length > 0 && (
-              <div className="p-4 bg-[#F8FAFC] border-t border-[#E2E8F0]">
-                <div className="flex justify-between items-center mb-4">
+              <div className="p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex flex-col gap-4">
+                
+                {/* Metode Pembayaran */}
+                <div className="flex flex-col gap-2">
+                  <label className="text-xs font-bold text-[#1E293B]">Metode Pembayaran</label>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => setPaymentMethod('cash')}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
+                        paymentMethod === 'cash' 
+                          ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]' 
+                          : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
+                      }`}
+                    >
+                      Cash / Tunai
+                    </button>
+                    <button 
+                      onClick={() => setPaymentMethod('tempo')}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
+                        paymentMethod === 'tempo' 
+                          ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]' 
+                          : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
+                      }`}
+                    >
+                      Tempo
+                    </button>
+                  </div>
+                  
+                  {paymentMethod === 'tempo' && (
+                    <div className="mt-2 flex items-center justify-between bg-white border border-[#E2E8F0] rounded-lg px-3 py-2">
+                      <span className="text-xs font-semibold text-[#64748B]">Lama Tempo:</span>
+                      <select 
+                        value={tempoDays}
+                        onChange={(e) => setTempoDays(e.target.value)}
+                        className="text-xs font-bold text-[#1E293B] border-none bg-transparent focus:outline-none focus:ring-0"
+                      >
+                        <option value="14">14 Hari</option>
+                        <option value="30">30 Hari</option>
+                        <option value="45">45 Hari</option>
+                      </select>
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex justify-between items-center pt-2 border-t border-[#E2E8F0]">
                   <span className="text-sm font-semibold text-[#64748B]">Total Belanja</span>
                   <span className="text-lg font-bold text-[#16A34A]">Rp {cartTotal.toLocaleString('id-ID')}</span>
                 </div>
+                
                 <button 
                   onClick={handleCheckout}
                   className="w-full py-3 bg-[#16A34A] text-white rounded-lg font-bold hover:bg-[#15803D] transition-colors shadow-sm"

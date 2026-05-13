@@ -1,6 +1,6 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
-import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award } from 'lucide-react';
+import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award, AlertTriangle } from 'lucide-react';
 import { Link } from 'react-router-dom';
 
 export default function DashboardSales() {
@@ -12,6 +12,23 @@ export default function DashboardSales() {
         <div>
           <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Sales - Fernando</h2>
           <p className="text-xs text-[#64748B] mt-1">Mobile field work & order management</p>
+        </div>
+
+        {/* Tempo Alert Banner */}
+        <div className="bg-gradient-to-r from-[#FEF2F2] to-white border border-[#FECACA] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-1 h-full bg-[#DC2626]"></div>
+          <div className="w-10 h-10 rounded-full bg-[#FEE2E2] flex items-center justify-center shrink-0">
+            <AlertTriangle className="w-5 h-5 text-[#DC2626] animate-pulse" />
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-[#991B1B] text-sm sm:text-base">Peringatan Jatuh Tempo!</h3>
+            <p className="text-xs sm:text-sm text-[#B91C1C] mt-0.5">
+              Bengkel <span className="font-bold">Berkah Sekawan Motor</span> menunggak tagihan selama 5 hari (Rp 15.400.000). Harap segera lakukan penagihan pada kunjungan berikutnya.
+            </p>
+          </div>
+          <Link to="/monitoring-piutang" className="bg-[#DC2626] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#B91C1C] transition-colors whitespace-nowrap text-center sm:w-auto w-full">
+            Lihat Detail
+          </Link>
         </div>
 
         {/* Stat Cards */}
