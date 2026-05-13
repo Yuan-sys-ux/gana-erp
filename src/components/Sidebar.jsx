@@ -18,7 +18,7 @@ import {
   TrendingUp
 } from 'lucide-react';
 
-export default function Sidebar() {
+export default function Sidebar({ isOpen, setIsOpen }) {
   const [role, setRole] = useState(() => localStorage.getItem('userRole') || 'admin');
   const navigate = useNavigate();
 
@@ -100,8 +100,22 @@ export default function Sidebar() {
   };
 
   return (
-    <div className="w-64 h-screen bg-[#312E81] text-white flex flex-col flex-shrink-0 sticky top-0">
-      {/* Brand Header */}
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 md:hidden transition-opacity"
+          onClick={() => setIsOpen(false)}
+        />
+      )}
+
+      <div className={`
+        fixed md:sticky top-0 left-0 z-50 h-screen w-64 bg-[#312E81] text-white flex flex-col shrink-0
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full'}
+        md:translate-x-0
+      `}>
+        {/* Brand Header */}
       <div className="h-16 flex items-center px-6 border-b border-[#3730A3] shrink-0 gap-3">
         <div className="w-8 h-8 rounded-lg bg-[#4F46E5] flex items-center justify-center shrink-0">
           <Building2 className="w-5 h-5 text-white" />
@@ -124,6 +138,7 @@ export default function Sidebar() {
                 <li key={itemIdx}>
                   <NavLink
                     to={item.path}
+                    onClick={() => setIsOpen && setIsOpen(false)}
                     className={({ isActive }) => {
                       return `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors text-sm font-medium ${
                         isActive
@@ -152,6 +167,6 @@ export default function Sidebar() {
           <span>Logout</span>
         </button>
       </div>
-    </div>
+    </>
   );
 }
