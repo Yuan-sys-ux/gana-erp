@@ -35,6 +35,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { name: 'Master Pelanggan', icon: <Users className="w-[18px] h-[18px]" />, path: '/data-pelanggan' },
         { name: 'Master Supplier', icon: <FileText className="w-[18px] h-[18px]" />, path: '/master-supplier' },
         { name: 'User Management', icon: <Users className="w-[18px] h-[18px]" />, path: '/user-management' },
+        { name: 'Pembelian (PO)', icon: <ShoppingCart className="w-[18px] h-[18px]" />, path: '/purchase-order' },
         { name: 'Daftar Penjualan', icon: <ShoppingCart className="w-[18px] h-[18px]" />, path: '/daftar-penjualan' },
       ]
     }
@@ -47,6 +48,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { name: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, path: '/dashboard' },
         { name: 'Approval Stok Masuk', icon: <CheckSquare className="w-[18px] h-[18px]" />, path: '/approval-stok' },
         { name: 'Riwayat Stok', icon: <History className="w-[18px] h-[18px]" />, path: '/riwayat-stok' },
+        { name: 'Pengiriman Barang', icon: <Truck className="w-[18px] h-[18px]" />, path: '/pengiriman-barang' },
       ]
     }
   ];

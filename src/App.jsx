@@ -1,4 +1,6 @@
+import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { initDb } from './utils/mockDb';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DataProduk from './pages/DataProduk';
@@ -16,8 +18,13 @@ import MonitoringPiutang from './pages/MonitoringPiutang';
 import InputPesanan from './pages/InputPesanan';
 import LaporanKunjungan from './pages/LaporanKunjungan';
 import TargetPenjualan from './pages/TargetPenjualan';
+import PurchaseOrder from './pages/PurchaseOrder';
 
 function App() {
+  useEffect(() => {
+    initDb();
+  }, []);
+
   return (
     <BrowserRouter>
       <Routes>
@@ -38,6 +45,7 @@ function App() {
         <Route path="/input-pesanan" element={<InputPesanan />} />
         <Route path="/laporan-kunjungan" element={<LaporanKunjungan />} />
         <Route path="/target-penjualan" element={<TargetPenjualan />} />
+        <Route path="/purchase-order" element={<PurchaseOrder />} />
         {/* Default route redirects to login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

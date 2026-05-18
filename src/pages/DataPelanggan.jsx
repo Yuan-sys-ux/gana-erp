@@ -1,20 +1,22 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, Plus, MapPin, Phone, Building2, Edit, X, Trash2 } from 'lucide-react';
+import { getCustomers, saveCustomers, addCustomer } from '../utils/mockDb';
 
 export default function DataPelanggan() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedCity, setSelectedCity] = useState('Semua Kota');
   const [selectedStatus, setSelectedStatus] = useState('Semua Status');
   
-  const [customers, setCustomers] = useState([
-    { id: 'PLG-001', name: 'Berkah Sekawan Motor', address: 'Jl. A. Yani Km 5, Banjarmasin', phone: '05113256789', outstanding: 15400000, lastOrder: '28 Apr 2026', status: 'Active', city: 'Banjarmasin' },
-    { id: 'PLG-002', name: 'Jaya Motor Banjarmasin', address: 'Jl. Lambung Mangkurat No. 45', phone: '05114567890', outstanding: 12800000, lastOrder: '27 Apr 2026', status: 'Active', city: 'Banjarmasin' },
-    { id: 'PLG-003', name: 'Mandiri Service', address: 'Jl. Gatot Subroto Km 3, Banjarbaru', phone: '05116789012', outstanding: 8600000, lastOrder: '27 Apr 2026', status: 'Active', city: 'Banjarbaru' },
-    { id: 'PLG-004', name: 'Abadi Motor', address: 'Jl. Hasan Basri, Banjarmasin', phone: '05111234567', outstanding: 5200000, lastOrder: '26 Apr 2026', status: 'Active', city: 'Banjarmasin' },
-    { id: 'PLG-005', name: 'Mitra Jaya Motor', address: 'Jl. Veteran, Martapura', phone: '05119876543', outstanding: 0, lastOrder: '20 Apr 2026', status: 'Active', city: 'Martapura' },
-    { id: 'PLG-006', name: 'Sejahtera Service', address: 'Jl. Sutoyo S, Banjarmasin', phone: '05113456789', outstanding: 2100000, lastOrder: '15 Apr 2026', status: 'Active', city: 'Banjarmasin' },
-  ]);
+  const [customers, setCustomers] = useState([]);
+
+  const loadCustomers = () => {
+    setCustomers(getCustomers());
+  };
+
+  useEffect(() => {
+    loadCustomers();
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -52,9 +54,12 @@ export default function DataPelanggan() {
   const handleSave = (e) => {
     e.preventDefault();
     if (editingCustomer) {
-      setCustomers(customers.map(c => c.id === editingCustomer.id ? formData : c));
+      const updatedCustomers = customers.map(c => c.id === editingCustomer.id ? formData : c);
+      saveCustomers(updatedCustomers);
+      loadCustomers();
     } else {
-      setCustomers([...customers, formData]);
+      addCustomer(formData);
+      loadCustomers();
     }
     handleCloseModal();
   };
@@ -64,7 +69,9 @@ export default function DataPelanggan() {
   };
 
   const handleDelete = () => {
-    setCustomers(customers.filter(c => c.id !== editingCustomer.id));
+    const updatedCustomers = customers.filter(c => c.id !== editingCustomer.id);
+    saveCustomers(updatedCustomers);
+    loadCustomers();
     setIsDeleteModalOpen(false);
     handleCloseModal();
   };

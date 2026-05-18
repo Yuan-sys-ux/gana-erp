@@ -1,21 +1,23 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getOrders, updateOrderStatus } from '../utils/mockDb';
 
 export default function PengirimanBarang() {
-  const [deliveries, setDeliveries] = useState({
-    diproses: [
-      { id: 'DO-20260511-001', customer: 'Berkah Sekawan Motor', qty: 15, address: 'Jl. A. Yani Km 5, Banjarmasin' },
-      { id: 'DO-20260511-002', customer: 'Jaya Motor Banjarmasin', qty: 8, address: 'Jl. Lambung Mangkurat No. 45' },
-    ],
-    dikirim: [
-      { id: 'DO-20260510-015', customer: 'Mandiri Service', qty: 25, address: 'Jl. Gatot Subroto Km 3, Banjarbaru', driver: 'Pak Udin (DA 8812 TX)' },
-    ],
-    terkirim: [
-      { id: 'DO-20260510-010', customer: 'Abadi Motor', qty: 12, address: 'Jl. Hasan Basri, Banjarmasin', time: '14:30 WITA' },
-      { id: 'DO-20260509-022', customer: 'Sejahtera Service', qty: 30, address: 'Jl. Sutoyo S, Banjarmasin', time: '10:15 WITA' },
-    ]
-  });
+  const [deliveries, setDeliveries] = useState({ diproses: [], dikirim: [], terkirim: [] });
+
+  const loadDeliveries = () => {
+    const orders = getOrders();
+    setDeliveries({
+      diproses: orders.filter(o => o.status === 'Approved'),
+      dikirim: orders.filter(o => o.status === 'Shipped'),
+      terkirim: orders.filter(o => o.status === 'Delivered' || o.status === 'Invoiced')
+    });
+  };
+
+  useEffect(() => {
+    loadDeliveries();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -30,11 +32,8 @@ export default function PengirimanBarang() {
     const driverName = prompt("Masukkan nama driver / plat nomor (Contoh: Pak Supri (DA 1234 XX)):");
     if (!driverName) return;
     
-    setDeliveries({
-      ...deliveries,
-      diproses: deliveries.diproses.filter(d => d.id !== id),
-      dikirim: [...deliveries.dikirim, { ...item, driver: driverName }]
-    });
+    updateOrderStatus(id, 'Shipped', { driver: driverName });
+    loadDeliveries();
   };
 
   const handleSelesaikanPengiriman = (id) => {
@@ -44,11 +43,8 @@ export default function PengirimanBarang() {
     const d = new Date();
     const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
 
-    setDeliveries({
-      ...deliveries,
-      dikirim: deliveries.dikirim.filter(d => d.id !== id),
-      terkirim: [{ ...item, time: timeStr }, ...deliveries.terkirim]
-    });
+    updateOrderStatus(id, 'Delivered', { time: timeStr });
+    loadDeliveries();
   };
 
   return (
@@ -112,7 +108,7 @@ export default function PengirimanBarang() {
                     onClick={() => handleAssignDriver(item.id)}
                     className="mt-4 w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-bold rounded-lg transition-colors"
                   >
-                    Assign Driver
+                    Approve & Kirim
                   </button>
                 </div>
               ))}

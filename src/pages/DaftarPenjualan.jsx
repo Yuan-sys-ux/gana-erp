@@ -1,15 +1,19 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, FileText, CheckCircle2, Clock, XCircle, ChevronDown, Download, Eye } from 'lucide-react';
+import { Search, FileText, CheckCircle2, Clock, XCircle, ChevronDown, Download, Eye, Check, X, AlertCircle } from 'lucide-react';
+import { getOrders, updateOrderStatus } from '../utils/mockDb';
 
 export default function DaftarPenjualan() {
-  const [salesOrders, setSalesOrders] = useState([
-    { id: 'SO-20260511-001', date: '11 Mei 2026', customer: 'Berkah Sekawan Motor', sales: 'Fernando', total: 4200000, status: 'Draft' },
-    { id: 'SO-20260511-002', date: '11 Mei 2026', customer: 'Jaya Motor Banjarmasin', sales: 'Budi Sales', total: 8500000, status: 'Approved' },
-    { id: 'SO-20260510-015', date: '10 Mei 2026', customer: 'Mandiri Service', sales: 'Fernando', total: 12400000, status: 'Shipped' },
-    { id: 'SO-20260510-016', date: '10 Mei 2026', customer: 'Abadi Motor', sales: 'Budi Sales', total: 3200000, status: 'Invoiced' },
-    { id: 'SO-20260509-022', date: '09 Mei 2026', customer: 'Mitra Jaya Motor', sales: 'Fernando', total: 5600000, status: 'Cancelled' },
-  ]);
+  const [salesOrders, setSalesOrders] = useState([]);
+
+  const loadOrders = () => {
+    const orders = getOrders();
+    setSalesOrders(orders);
+  };
+
+  useEffect(() => {
+    loadOrders();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('Semua Status');
@@ -22,6 +26,25 @@ export default function DaftarPenjualan() {
       return matchSearch && matchStatus;
     });
   }, [salesOrders, searchTerm, statusFilter]);
+
+  const [approveModal, setApproveModal] = useState({ isOpen: false, orderId: null });
+  const [detailModal, setDetailModal] = useState({ isOpen: false, order: null });
+
+  const confirmApproveOrder = (id) => {
+    setApproveModal({ isOpen: true, orderId: id });
+  };
+
+  const handleApprove = () => {
+    if (approveModal.orderId) {
+      updateOrderStatus(approveModal.orderId, 'Approved');
+      loadOrders();
+      setApproveModal({ isOpen: false, orderId: null });
+    }
+  };
+
+  const showDetail = (order) => {
+    setDetailModal({ isOpen: true, order });
+  };
 
   const handleExportCSV = () => {
     if (filteredOrders.length === 0) return alert("Tidak ada data untuk dieksport");
@@ -139,8 +162,19 @@ export default function DaftarPenjualan() {
                       {getStatusBadge(so.status)}
                     </td>
                     <td className="py-4 px-6">
-                      <div className="flex justify-center">
-                        <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] transition-colors text-xs font-semibold">
+                      <div className="flex justify-center gap-2">
+                        {so.status === 'Draft' && (
+                          <button 
+                            onClick={() => confirmApproveOrder(so.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#16A34A] text-white hover:bg-[#15803D] transition-colors text-xs font-semibold"
+                          >
+                            <Check className="w-3.5 h-3.5" /> Approve
+                          </button>
+                        )}
+                        <button 
+                          onClick={() => showDetail(so)}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[#E2E8F0] text-[#475569] hover:bg-[#F1F5F9] transition-colors text-xs font-semibold"
+                        >
                           <Eye className="w-4 h-4" /> Detail
                         </button>
                       </div>
@@ -157,6 +191,82 @@ export default function DaftarPenjualan() {
         </div>
 
       </div>
+
+      {/* Approve Modal */}
+      {approveModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-[#EEF2FF] rounded-full flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-[#4F46E5]" />
+            </div>
+            <h3 className="text-lg font-bold text-[#1E293B] mb-2">Approve Pesanan?</h3>
+            <p className="text-sm text-[#64748B] mb-6">
+              Apakah Anda yakin ingin memverifikasi dan menyetujui pesanan ini? Pesanan akan diteruskan ke Kepala Gudang.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => setApproveModal({ isOpen: false, orderId: null })} className="flex-1 py-2.5 bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] font-semibold rounded-xl transition-colors">
+                Batal
+              </button>
+              <button onClick={handleApprove} className="flex-1 py-2.5 bg-[#4F46E5] text-white hover:bg-[#4338CA] font-semibold rounded-xl transition-colors shadow-sm">
+                Ya, Approve
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Modal */}
+      {detailModal.isOpen && detailModal.order && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex justify-between items-center p-5 border-b border-[#E2E8F0] bg-[#F8FAFC]">
+              <h3 className="font-bold text-[#1E293B]">Detail Pesanan</h3>
+              <button onClick={() => setDetailModal({ isOpen: false, order: null })} className="text-[#64748B] hover:text-[#1E293B]">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 flex flex-col gap-4">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="text-xs text-[#64748B] font-bold mb-1">NO. SALES ORDER</p>
+                  <p className="text-sm font-bold text-[#4F46E5]">{detailModal.order.id}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-[#64748B] font-bold mb-1">TANGGAL</p>
+                  <p className="text-sm font-bold text-[#1E293B]">{detailModal.order.date}</p>
+                </div>
+              </div>
+              <div className="border-t border-dashed border-[#E2E8F0]"></div>
+              <div>
+                <p className="text-xs text-[#64748B] font-bold mb-1">PELANGGAN</p>
+                <p className="text-sm font-bold text-[#1E293B]">{detailModal.order.customer}</p>
+                <p className="text-xs text-[#475569] mt-0.5">{detailModal.order.address}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-[#64748B] font-bold mb-1">SALES</p>
+                  <p className="text-sm font-medium text-[#1E293B]">{detailModal.order.sales}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-[#64748B] font-bold mb-1">METODE PEMBAYARAN</p>
+                  <p className="text-sm font-medium text-[#1E293B] capitalize">{detailModal.order.paymentMethod || 'Cash'}</p>
+                </div>
+              </div>
+              <div className="border-t border-dashed border-[#E2E8F0]"></div>
+              <div className="flex justify-between items-center bg-[#F8FAFC] p-3 rounded-lg border border-[#E2E8F0]">
+                <span className="text-sm font-bold text-[#64748B]">Total Belanja ({detailModal.order.qty || 0} Item)</span>
+                <span className="text-lg font-bold text-[#16A34A]">Rp {detailModal.order.total?.toLocaleString('id-ID')}</span>
+              </div>
+            </div>
+            <div className="p-5 border-t border-[#E2E8F0] flex justify-end">
+              <button onClick={() => setDetailModal({ isOpen: false, order: null })} className="px-5 py-2.5 bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] font-semibold rounded-xl transition-colors">
+                Tutup
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </DashboardLayout>
   );
 }

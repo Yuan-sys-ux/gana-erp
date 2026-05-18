@@ -1,6 +1,7 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, ShoppingCart, Plus, Minus, Trash2, X } from 'lucide-react';
+import { Search, ShoppingCart, Plus, Minus, Trash2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { getCustomers, addCustomer, addOrder } from '../utils/mockDb';
 
 export default function InputPesanan() {
   const allProducts = [
@@ -18,24 +19,52 @@ export default function InputPesanan() {
   const [selectedBengkel, setSelectedBengkel] = useState('');
   
   // State for Bengkel List
-  const [bengkels, setBengkels] = useState([
-    "Berkah Sekawan Motor",
-    "Jaya Motor",
-    "Mandiri Service"
-  ]);
+  const [bengkels, setBengkels] = useState([]);
+
+  useEffect(() => {
+    const customers = getCustomers();
+    setBengkels(customers.map(c => c.name));
+  }, []);
   const [isAddBengkelOpen, setIsAddBengkelOpen] = useState(false);
-  const [newBengkelName, setNewBengkelName] = useState('');
+  const [newCustomerForm, setNewCustomerForm] = useState({
+    name: '',
+    address: '',
+    phone: '',
+    city: 'Banjarmasin'
+  });
 
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' or 'tempo'
   const [tempoDays, setTempoDays] = useState('14');
 
+  // Custom Alert State
+  const [alertModal, setAlertModal] = useState({ isOpen: false, type: 'success', title: '', message: '' });
+
+  const showAlert = (type, title, message) => {
+    setAlertModal({ isOpen: true, type, title, message });
+  };
+  
+  const closeAlert = () => {
+    setAlertModal({ ...alertModal, isOpen: false });
+  };
+
   const handleAddBengkel = (e) => {
     e.preventDefault();
-    if(newBengkelName.trim()) {
-      setBengkels([...bengkels, newBengkelName]);
-      setSelectedBengkel(newBengkelName);
-      setNewBengkelName('');
+    if(newCustomerForm.name.trim()) {
+      const newCustomer = {
+        id: `PLG-NEW-${Date.now()}`,
+        name: newCustomerForm.name,
+        address: newCustomerForm.address || '-',
+        phone: newCustomerForm.phone || '-',
+        outstanding: 0,
+        lastOrder: '-',
+        status: 'Active',
+        city: newCustomerForm.city || 'Banjarmasin'
+      };
+      addCustomer(newCustomer);
+      setBengkels([...bengkels, newCustomerForm.name]);
+      setSelectedBengkel(newCustomerForm.name);
+      setNewCustomerForm({ name: '', address: '', phone: '', city: 'Banjarmasin' });
       setIsAddBengkelOpen(false);
     }
   };
@@ -77,16 +106,33 @@ export default function InputPesanan() {
 
   const handleCheckout = () => {
     if (!selectedBengkel || selectedBengkel === '-- Pilih Bengkel --') {
-      alert('Silakan pilih bengkel terlebih dahulu!');
+      showAlert('error', 'Gagal', 'Silakan pilih bengkel terlebih dahulu!');
       return;
     }
     if (cart.length === 0) {
-      alert('Keranjang order masih kosong!');
+      showAlert('error', 'Gagal', 'Keranjang order masih kosong!');
       return;
     }
     
     let paymentInfo = paymentMethod === 'cash' ? 'Cash / Tunai' : `Tempo (${tempoDays} Hari)`;
-    alert(`Pesanan berhasil dibuat untuk ${selectedBengkel}!\nTotal: Rp ${cartTotal.toLocaleString('id-ID')}\nMetode Pembayaran: ${paymentInfo}`);
+    
+    const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
+    const customerObj = getCustomers().find(c => c.name === selectedBengkel);
+    const customerAddress = customerObj ? customerObj.address : '-';
+
+    const newOrder = {
+      customer: selectedBengkel,
+      sales: 'Sales System', // Mock sales name
+      total: cartTotal,
+      status: 'Draft',
+      qty: totalQty,
+      address: customerAddress,
+      paymentMethod: paymentMethod
+    };
+    
+    addOrder(newOrder);
+
+    showAlert('success', 'Pesanan Berhasil!', `Pesanan untuk ${selectedBengkel} senilai Rp ${cartTotal.toLocaleString('id-ID')} telah dibuat dengan metode ${paymentInfo}. Pesanan ini sekarang masuk status "Draft" di Admin.`);
     setCart([]);
     setSelectedBengkel('');
     setPaymentMethod('cash');
@@ -100,6 +146,29 @@ export default function InputPesanan() {
           <h2 className="text-xl font-bold text-[#1E293B]">Quick Order Form</h2>
           <p className="text-sm text-[#64748B] mt-1">Input pesanan cepat untuk bengkel</p>
         </div>
+
+        {/* Alert Modal */}
+        {alertModal.isOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className={`p-6 text-center ${alertModal.type === 'success' ? 'bg-[#F0FDF4]' : 'bg-[#FEE2E2]'}`}>
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${alertModal.type === 'success' ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FECACA] text-[#DC2626]'}`}>
+                  {alertModal.type === 'success' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+                </div>
+                <h3 className="text-xl font-bold text-[#1E293B] mb-2">{alertModal.title}</h3>
+                <p className="text-sm text-[#475569]">{alertModal.message}</p>
+              </div>
+              <div className="p-4 bg-white border-t border-[#E2E8F0]">
+                <button 
+                  onClick={closeAlert}
+                  className={`w-full py-2.5 rounded-xl font-bold text-white transition-colors shadow-sm ${alertModal.type === 'success' ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#DC2626] hover:bg-[#B91C1C]'}`}
+                >
+                  OK, Mengerti
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Form Select Bengkel */}
         <div className="bg-white p-6 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0]">
@@ -137,16 +206,52 @@ export default function InputPesanan() {
                 </button>
               </div>
               <form onSubmit={handleAddBengkel} className="p-5">
-                <div className="mb-5">
+                <div className="mb-3">
                   <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Bengkel <span className="text-[#EF4444]">*</span></label>
                   <input 
                     type="text" 
                     required
-                    value={newBengkelName}
-                    onChange={(e) => setNewBengkelName(e.target.value)}
+                    value={newCustomerForm.name}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, name: e.target.value})}
                     placeholder="Masukkan nama bengkel..."
-                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                   />
+                </div>
+                <div className="mb-3">
+                  <label className="block text-xs font-bold text-[#1E293B] mb-2">Alamat Lengkap <span className="text-[#EF4444]">*</span></label>
+                  <textarea 
+                    required
+                    rows="2"
+                    value={newCustomerForm.address}
+                    onChange={(e) => setNewCustomerForm({...newCustomerForm, address: e.target.value})}
+                    placeholder="Contoh: Jl. Ahmad Yani Km 5..."
+                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] resize-none"
+                  ></textarea>
+                </div>
+                <div className="flex gap-3 mb-5">
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-[#1E293B] mb-2">No. Telepon <span className="text-[#EF4444]">*</span></label>
+                    <input 
+                      type="text" 
+                      required
+                      value={newCustomerForm.phone}
+                      onChange={(e) => setNewCustomerForm({...newCustomerForm, phone: e.target.value.replace(/\D/g, '')})}
+                      placeholder="0812..."
+                      className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <label className="block text-xs font-bold text-[#1E293B] mb-2">Kota</label>
+                    <select 
+                      value={newCustomerForm.city}
+                      onChange={(e) => setNewCustomerForm({...newCustomerForm, city: e.target.value})}
+                      className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                    >
+                      <option value="Banjarmasin">Banjarmasin</option>
+                      <option value="Banjarbaru">Banjarbaru</option>
+                      <option value="Martapura">Martapura</option>
+                    </select>
+                  </div>
                 </div>
                 <div className="flex justify-end gap-3">
                   <button 
