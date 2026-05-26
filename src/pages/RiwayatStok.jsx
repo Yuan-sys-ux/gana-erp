@@ -1,14 +1,30 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { History, Search, ArrowDownRight, ArrowUpRight, Filter, Download } from 'lucide-react';
+import { useState, useEffect, useMemo } from 'react';
+import { getStockHistory } from '../utils/mockDb';
 
 export default function RiwayatStok() {
-  const stockHistory = [
-    { id: 'TRX-260511-01', date: '11 Mei 2026 14:30', type: 'out', product: 'Kixx G1 5W-30', qty: 15, ref: 'DO-20260511-001 (Berkah Sekawan Motor)', balance: 105 },
-    { id: 'TRX-260511-02', date: '11 Mei 2026 10:15', type: 'in', product: 'Kixx G1 5W-30', qty: 50, ref: 'RCV-20260511-02 (PT. ABM)', balance: 120 },
-    { id: 'TRX-260510-15', date: '10 Mei 2026 16:00', type: 'out', product: 'Syntium 7000 0W-20', qty: 25, ref: 'DO-20260510-015 (Mandiri Service)', balance: 80 },
-    { id: 'TRX-260510-10', date: '10 Mei 2026 13:20', type: 'out', product: 'Urania 3000 15W-40', qty: 12, ref: 'DO-20260510-010 (Abadi Motor)', balance: 110 },
-    { id: 'TRX-260509-05', date: '09 Mei 2026 09:45', type: 'in', product: 'Syntium 7000 0W-20', qty: 100, ref: 'RCV-20260509-05 (PT. PLI)', balance: 105 },
-  ];
+  const [stockHistory, setStockHistory] = useState([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [typeFilter, setTypeFilter] = useState('Semua Tipe');
+
+  useEffect(() => {
+    setStockHistory(getStockHistory());
+  }, []);
+
+  const filteredHistory = useMemo(() => {
+    return stockHistory.filter(item => {
+      // Type Filter
+      if (typeFilter === 'Barang Masuk (IN)' && item.type !== 'in') return false;
+      if (typeFilter === 'Barang Keluar (OUT)' && item.type !== 'out') return false;
+
+      // Search Filter
+      const searchLower = searchTerm.toLowerCase();
+      const matchProduct = item.product.toLowerCase().includes(searchLower);
+      const matchRef = item.ref.toLowerCase().includes(searchLower);
+      return matchProduct || matchRef;
+    });
+  }, [stockHistory, searchTerm, typeFilter]);
 
   return (
     <DashboardLayout>
@@ -34,6 +50,8 @@ export default function RiwayatStok() {
             <input 
               type="text" 
               placeholder="Cari Produk atau No Referensi..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full pl-10 pr-4 py-2 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
             />
           </div>
@@ -44,10 +62,14 @@ export default function RiwayatStok() {
               <option>Bulan Ini</option>
               <option>Bulan Lalu</option>
             </select>
-            <select className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white flex-1 sm:w-[150px]">
-              <option>Semua Tipe</option>
-              <option>Barang Masuk (IN)</option>
-              <option>Barang Keluar (OUT)</option>
+            <select 
+              value={typeFilter}
+              onChange={(e) => setTypeFilter(e.target.value)}
+              className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white flex-1 sm:w-[150px]"
+            >
+              <option value="Semua Tipe">Semua Tipe</option>
+              <option value="Barang Masuk (IN)">Barang Masuk (IN)</option>
+              <option value="Barang Keluar (OUT)">Barang Keluar (OUT)</option>
             </select>
           </div>
         </div>
@@ -67,7 +89,7 @@ export default function RiwayatStok() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {stockHistory.map((item, idx) => (
+                {filteredHistory.map((item, idx) => (
                   <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
                     <td className="py-4 px-6 text-[#475569] font-medium">{item.date}</td>
                     <td className="py-4 px-6 font-bold text-[#1E293B]">{item.product}</td>

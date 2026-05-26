@@ -14,9 +14,7 @@ export default function MasterSupplier() {
       address: 'Jl. Jababeka Raya Blok C No. 10-11, Cikarang, Bekasi',
       phone: '021 89131000',
       email: 'info@pli.co.id',
-      contactPerson: 'Bapak Hendro',
-      totalPo: '145',
-      lastPo: '28 Apr 2026'
+      contactPerson: 'Bapak Hendro'
     },
     {
       id: 2,
@@ -28,16 +26,14 @@ export default function MasterSupplier() {
       address: 'Kawasan Industri MM2100, Cikarang Barat, Bekasi',
       phone: '021 89982100',
       email: 'sales@abm.co.id',
-      contactPerson: 'Ibu Siti Nurjanah',
-      totalPo: '132',
-      lastPo: '27 Apr 2026'
+      contactPerson: 'Ibu Siti Nurjanah'
     }
   ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [formData, setFormData] = useState({
-    id: '', name: '', address: '', phone: '', email: '', contactPerson: '', totalPo: '', lastPo: '', color: '', textColor: '', bgColor: '', borderColor: ''
+    id: '', name: '', address: '', phone: '', email: '', contactPerson: '', color: '', textColor: '', bgColor: '', borderColor: ''
   });
 
   const handleOpenModal = (supplier) => {
@@ -117,25 +113,10 @@ export default function MasterSupplier() {
                   </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 gap-4 mt-2">
-                  <div className="bg-[#F8FAFC] rounded-lg p-3 border border-[#E2E8F0]">
-                    <span className="text-[10px] text-[#94A3B8] block mb-1">Total PO</span>
-                    <span className="text-lg font-bold text-[#1E293B]">{supplier.totalPo}</span>
-                  </div>
-                  <div className="bg-[#F8FAFC] rounded-lg p-3 border border-[#E2E8F0]">
-                    <span className="text-[10px] text-[#94A3B8] block mb-1">Last PO</span>
-                    <span className="text-sm font-bold text-[#1E293B]">{supplier.lastPo}</span>
-                  </div>
-                </div>
-
                 {/* Actions */}
-                <div className="flex gap-3 mt-auto pt-4">
-                  <button onClick={() => handleOpenModal(supplier)} className="flex-1 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold py-2.5 rounded-lg text-sm transition-colors shadow-sm">
+                <div className="mt-auto pt-4">
+                  <button onClick={() => handleOpenModal(supplier)} className="w-full bg-[#4F46E5] hover:bg-[#4338CA] text-white font-semibold py-2.5 rounded-lg text-sm transition-colors shadow-sm">
                     Edit Supplier
-                  </button>
-                  <button className="flex-1 bg-white border border-[#E2E8F0] hover:bg-gray-50 text-[#334155] font-semibold py-2.5 rounded-lg text-sm transition-colors shadow-sm">
-                    Riwayat PO
                   </button>
                 </div>
               </div>
@@ -163,11 +144,6 @@ export default function MasterSupplier() {
                   <td className="py-4 px-6 font-semibold text-[#334155]">Brand</td>
                   <td className="py-4 px-6 text-[#475569]">Petronas</td>
                   <td className="py-4 px-6 text-[#475569]">Kixx</td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0]">
-                  <td className="py-4 px-6 font-semibold text-[#334155]">Total Purchase Orders</td>
-                  <td className="py-4 px-6 text-[#475569]">{suppliers[0]?.totalPo} PO</td>
-                  <td className="py-4 px-6 text-[#475569]">{suppliers[1]?.totalPo} PO</td>
                 </tr>
                 <tr className="border-b border-[#E2E8F0]">
                   <td className="py-4 px-6 font-semibold text-[#334155]">Payment Terms</td>

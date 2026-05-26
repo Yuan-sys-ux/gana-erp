@@ -18,7 +18,6 @@ import MonitoringPiutang from './pages/MonitoringPiutang';
 import InputPesanan from './pages/InputPesanan';
 import LaporanKunjungan from './pages/LaporanKunjungan';
 import TargetPenjualan from './pages/TargetPenjualan';
-import PurchaseOrder from './pages/PurchaseOrder';
 
 function App() {
   useEffect(() => {
@@ -45,7 +44,6 @@ function App() {
         <Route path="/input-pesanan" element={<InputPesanan />} />
         <Route path="/laporan-kunjungan" element={<LaporanKunjungan />} />
         <Route path="/target-penjualan" element={<TargetPenjualan />} />
-        <Route path="/purchase-order" element={<PurchaseOrder />} />
         {/* Default route redirects to login */}
         <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>

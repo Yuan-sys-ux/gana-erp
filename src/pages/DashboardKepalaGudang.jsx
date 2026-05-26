@@ -2,8 +2,22 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
 import { AlertCircle, Package, TrendingUp, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { getProducts, getIncomingStock } from '../utils/mockDb';
 
 export default function DashboardKepalaGudang() {
+  const [products, setProducts] = useState([]);
+  const [incomingStock, setIncomingStock] = useState([]);
+
+  useEffect(() => {
+    setProducts(getProducts());
+    setIncomingStock(getIncomingStock());
+  }, []);
+
+  const pendingApprovals = incomingStock.filter(s => s.status === 'pending');
+  const approvedThisMonth = incomingStock.filter(s => s.status === 'approved');
+  const totalApprovedQty = approvedThisMonth.reduce((acc, curr) => acc + curr.totalQty, 0);
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
@@ -18,25 +32,25 @@ export default function DashboardKepalaGudang() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard 
             title="Menunggu Approval" 
-            value="3" 
+            value={pendingApprovals.length.toString()} 
             icon={<AlertCircle className="w-5 h-5" />} 
             bgClass="bg-[#EAB308]"
           />
           <StatCard 
-            title="Total Produk" 
-            value="32" 
+            title="Total Jenis Produk" 
+            value={products.length.toString()} 
             icon={<Package className="w-5 h-5" />} 
             bgClass="bg-[#3B82F6]"
           />
           <StatCard 
-            title="Stok Masuk Bulan Ini" 
-            value="145 Dus" 
+            title="Stok Masuk Disetujui" 
+            value={`${totalApprovedQty} Karton`} 
             icon={<TrendingUp className="w-5 h-5" />} 
             bgClass="bg-[#22C55E]"
           />
           <StatCard 
             title="Status QC Sesuai" 
-            value="98%" 
+            value="100%" 
             icon={<ClipboardCheck className="w-5 h-5" />} 
             bgClass="bg-[#A855F7]"
           />
@@ -50,46 +64,49 @@ export default function DashboardKepalaGudang() {
               <p className="text-xs text-[#64748B] mt-1">Validasi kualitas dan kuantitas barang dari supplier</p>
             </div>
             <Link to="/approval-stok" className="bg-[#4F46E5] text-white text-xs font-semibold py-2 px-4 rounded-lg hover:bg-[#4338CA] transition-colors">
-              Lihat Semua
+              Buka Halaman Approval
             </Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left whitespace-nowrap">
               <thead>
                 <tr className="bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">NO PO</th>
+                  <th className="py-4 px-6 border-b border-[#E2E8F0]">NO RCV</th>
+                  <th className="py-4 px-6 border-b border-[#E2E8F0]">NO SURAT JALAN</th>
                   <th className="py-4 px-6 border-b border-[#E2E8F0]">SUPPLIER</th>
                   <th className="py-4 px-6 border-b border-[#E2E8F0]">TANGGAL</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">TOTAL DUS</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">STATUS QC</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">AKSI</th>
+                  <th className="py-4 px-6 border-b border-[#E2E8F0]">TOTAL ITEM</th>
+                  <th className="py-4 px-6 border-b border-[#E2E8F0]">TOTAL QTY</th>
+                  <th className="py-4 px-6 border-b border-[#E2E8F0] text-center">AKSI</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">PO-2026-012</td>
-                  <td className="py-4 px-6 text-[#475569]">PT. PLI (Petronas)</td>
-                  <td className="py-4 px-6 text-[#64748B]">28 Apr 2026</td>
-                  <td className="py-4 px-6 text-[#1E293B]">50 Dus</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Menunggu</span></td>
-                  <td className="py-4 px-6"><button className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA]">Review QC</button></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">PO-2026-013</td>
-                  <td className="py-4 px-6 text-[#475569]">PT. ABM (Kixx)</td>
-                  <td className="py-4 px-6 text-[#64748B]">27 Apr 2026</td>
-                  <td className="py-4 px-6 text-[#1E293B]">30 Dus</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Menunggu</span></td>
-                  <td className="py-4 px-6"><button className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA]">Review QC</button></td>
-                </tr>
-                <tr className="hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">PO-2026-014</td>
-                  <td className="py-4 px-6 text-[#475569]">PT. PLI (Petronas)</td>
-                  <td className="py-4 px-6 text-[#64748B]">26 Apr 2026</td>
-                  <td className="py-4 px-6 text-[#1E293B]">40 Dus</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Menunggu</span></td>
-                  <td className="py-4 px-6"><button className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA]">Review QC</button></td>
-                </tr>
+                {pendingApprovals.length > 0 ? (
+                  pendingApprovals.map((item) => (
+                    <tr key={item.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-4 px-6 font-bold text-[#1E293B]">{item.id}</td>
+                      <td className="py-4 px-6 text-[#64748B] font-medium">{item.sj}</td>
+                      <td className="py-4 px-6 text-[#475569]">{item.supplier}</td>
+                      <td className="py-4 px-6 text-[#64748B]">{item.date}</td>
+                      <td className="py-4 px-6 text-[#1E293B]">{item.items} Produk</td>
+                      <td className="py-4 px-6 font-bold text-[#1E293B]">{item.totalQty} Karton</td>
+                      <td className="py-4 px-6 text-center">
+                        <Link 
+                          to="/approval-stok"
+                          className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA] bg-[#EEF2FF] px-3 py-1.5 rounded-lg border border-[#C7D2FE] transition-colors"
+                        >
+                          Review & Approve
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan="7" className="py-8 text-center text-[#64748B] font-medium">
+                      Tidak ada penerimaan stok yang menunggu approval.
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -103,39 +120,34 @@ export default function DashboardKepalaGudang() {
               Riwayat Lengkap
             </Link>
           </div>
-          <div className="p-2">
-            <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors rounded-lg">
-              <div>
-                <h4 className="font-bold text-sm text-[#1E293B]">Kixx G1 5W-30</h4>
-                <p className="text-xs text-[#64748B] mt-0.5">Kixx</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-sm text-[#1E293B]">15 Dus (300 L)</p>
-                <span className="inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#FEF3C7] text-[#D97706]">Low</span>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between p-4 border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors rounded-lg">
-              <div>
-                <h4 className="font-bold text-sm text-[#1E293B]">Petronas Syntium 5000 10W-40</h4>
-                <p className="text-xs text-[#64748B] mt-0.5">Petronas</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-sm text-[#1E293B]">8 Dus (160 L)</p>
-                <span className="inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#FEE2E2] text-[#EF4444]">Critical</span>
-              </div>
-            </div>
+          <div className="p-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+            {products.map((p) => {
+              const statusClass = p.stokKarton < 70 
+                ? 'bg-[#FEE2E2] text-[#EF4444]' 
+                : p.stokKarton < 100 
+                  ? 'bg-[#FEF3C7] text-[#D97706]' 
+                  : 'bg-[#DCFCE7] text-[#16A34A]';
+              const statusLabel = p.stokKarton < 70 
+                ? 'Critical' 
+                : p.stokKarton < 100 
+                  ? 'Low' 
+                  : 'Good';
 
-            <div className="flex items-center justify-between p-4 hover:bg-[#F8FAFC] transition-colors rounded-lg">
-              <div>
-                <h4 className="font-bold text-sm text-[#1E293B]">Kixx HD1 15W-40</h4>
-                <p className="text-xs text-[#64748B] mt-0.5">Kixx</p>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-sm text-[#1E293B]">45 Dus (900 L)</p>
-                <span className="inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold bg-[#DCFCE7] text-[#16A34A]">Good</span>
-              </div>
-            </div>
+              return (
+                <div key={p.id} className="flex items-center justify-between p-4 border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors rounded-xl">
+                  <div>
+                    <h4 className="font-bold text-sm text-[#1E293B]">{p.name}</h4>
+                    <p className="text-xs text-[#64748B] mt-0.5">{p.brand} &bull; {p.sae} &bull; {p.kemasan}</p>
+                  </div>
+                  <div className="text-right flex flex-col items-end">
+                    <p className="font-black text-sm text-[#1E293B]">{p.stokKarton} Karton <span className="text-xs text-[#64748B] font-normal">({p.stokLiter} L)</span></p>
+                    <span className={`inline-block mt-1 px-2.5 py-0.5 rounded text-[10px] font-bold ${statusClass}`}>
+                      {statusLabel}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

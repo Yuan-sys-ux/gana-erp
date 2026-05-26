@@ -1,22 +1,18 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, Plus, Edit, Trash2, Package, X } from 'lucide-react';
+import { getProducts, saveProducts } from '../utils/mockDb';
 
 export default function DataProduk() {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedBrand, setSelectedBrand] = useState('Semua Brand');
   const [selectedCategory, setSelectedCategory] = useState('Semua Kategori');
   
-  const [products, setProducts] = useState([
-    { id: 'PRD-001', brand: 'Kixx', name: 'Kixx G1 5W-30', sae: '5W-30', kemasan: '4L', kategori: 'Gasoline', harga: 400000, stokKarton: 120, stokLiter: 480 },
-    { id: 'PRD-002', brand: 'Kixx', name: 'Kixx G1 10W-40', sae: '10W-40', kemasan: '4L', kategori: 'Gasoline', harga: 380000, stokKarton: 95, stokLiter: 380 },
-    { id: 'PRD-003', brand: 'Petronas', name: 'Syntium 5000 10W-40', sae: '10W-40', kemasan: '4L', kategori: 'Synthetic', harga: 420000, stokKarton: 150, stokLiter: 600 },
-    { id: 'PRD-004', brand: 'Petronas', name: 'Syntium 7000 0W-20', sae: '0W-20', kemasan: '4L', kategori: 'Fully Synthetic', harga: 520000, stokKarton: 80, stokLiter: 320 },
-    { id: 'PRD-005', brand: 'Kixx', name: 'Kixx HD1 15W-40', sae: '15W-40', kemasan: '5L', kategori: 'Diesel', harga: 270000, stokKarton: 200, stokLiter: 1000 },
-    { id: 'PRD-006', brand: 'Petronas', name: 'Urania 3000 15W-40', sae: '15W-40', kemasan: '5L', kategori: 'Diesel', harga: 290000, stokKarton: 110, stokLiter: 550 },
-    { id: 'PRD-007', brand: 'Kixx', name: 'Kixx PAO 5W-40', sae: '5W-40', kemasan: '4L', kategori: 'Fully Synthetic', harga: 480000, stokKarton: 65, stokLiter: 260 },
-    { id: 'PRD-008', brand: 'Petronas', name: 'Syntium 3000 5W-40', sae: '5W-40', kemasan: '4L', kategori: 'Semi Synthetic', harga: 450000, stokKarton: 90, stokLiter: 360 },
-  ]);
+  const [products, setProducts] = useState([]);
+
+  useEffect(() => {
+    setProducts(getProducts());
+  }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -52,11 +48,14 @@ export default function DataProduk() {
 
   const handleSave = (e) => {
     e.preventDefault();
+    let updated;
     if (editingProduct) {
-      setProducts(products.map(p => p.id === editingProduct.id ? formData : p));
+      updated = products.map(p => p.id === editingProduct.id ? formData : p);
     } else {
-      setProducts([...products, formData]);
+      updated = [...products, formData];
     }
+    setProducts(updated);
+    saveProducts(updated);
     handleCloseModal();
   };
 
@@ -67,7 +66,9 @@ export default function DataProduk() {
 
   const handleDelete = () => {
     if (editingProduct) {
-      setProducts(products.filter(p => p.id !== editingProduct.id));
+      const updated = products.filter(p => p.id !== editingProduct.id);
+      setProducts(updated);
+      saveProducts(updated);
       setIsDeleteModalOpen(false);
       setEditingProduct(null);
     }

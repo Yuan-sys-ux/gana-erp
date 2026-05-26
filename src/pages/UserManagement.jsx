@@ -21,6 +21,7 @@ export default function UserManagement() {
   const [userToDelete, setUserToDelete] = useState(null);
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
   const [formData, setFormData] = useState({ id: null, name: '', username: '', role: 'Admin', status: 'Active' });
+  const [validationError, setValidationError] = useState('');
 
   // Filtering Logic
   const filteredUsers = useMemo(() => {
@@ -47,6 +48,7 @@ export default function UserManagement() {
 
   // Handlers
   const confirmDelete = (user) => {
+    if (user.role === 'Owner') return;
     setUserToDelete(user);
     setIsDeleteModalOpen(true);
   };
@@ -62,17 +64,20 @@ export default function UserManagement() {
   const openAddModal = () => {
     setModalMode('add');
     setFormData({ id: null, name: '', username: '', role: 'Admin', status: 'Active' });
+    setValidationError('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (user) => {
     setModalMode('edit');
     setFormData(user);
+    setValidationError('');
     setIsModalOpen(true);
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
+    setValidationError('');
   };
 
   const getRoleColors = (role) => {
@@ -88,17 +93,53 @@ export default function UserManagement() {
 
   const handleSave = (e) => {
     e.preventDefault();
+    
+    const cleanedName = formData.name.trim();
+    const cleanedUsername = formData.username.trim().toLowerCase();
+    
+    // Strict Input Validation
+    if (cleanedName.length < 3) {
+      setValidationError('Nama lengkap harus terdiri dari minimal 3 karakter.');
+      return;
+    }
+    
+    if (!/^[a-z0-9_]{3,20}$/.test(cleanedUsername)) {
+      setValidationError('Username harus 3-20 karakter dan hanya boleh berisi huruf kecil, angka, dan underscore (_).');
+      return;
+    }
+    
+    const usernameExists = users.some(u => u.username.toLowerCase() === cleanedUsername && u.id !== formData.id);
+    if (usernameExists) {
+      setValidationError('Username sudah terdaftar di sistem. Silakan pilih username lain.');
+      return;
+    }
+    
+    // Strict Role Validation
+    if (formData.role === 'Owner') {
+      const isCurrentlyOwner = modalMode === 'edit' && users.find(u => u.id === formData.id)?.role === 'Owner';
+      if (!isCurrentlyOwner) {
+        setValidationError('Role Owner tidak dapat dibuat baru atau dialihkan.');
+        return;
+      }
+    }
+    
+    const updatedFormData = {
+      ...formData,
+      name: cleanedName,
+      username: cleanedUsername
+    };
+
     if (modalMode === 'add') {
       const newUser = {
-        ...formData,
+        ...updatedFormData,
         id: Date.now(),
         created: new Date().toLocaleDateString('id-ID'),
         avatarColor: 'bg-[#4F46E5]',
-        roleColor: getRoleColors(formData.role)
+        roleColor: getRoleColors(updatedFormData.role)
       };
       setUsers([...users, newUser]);
     } else {
-      setUsers(users.map(u => u.id === formData.id ? { ...formData, roleColor: getRoleColors(formData.role) } : u));
+      setUsers(users.map(u => u.id === updatedFormData.id ? { ...updatedFormData, roleColor: getRoleColors(updatedFormData.role) } : u));
     }
     closeModal();
   };
@@ -208,7 +249,16 @@ export default function UserManagement() {
                           <button onClick={() => openEditModal(user)} className="text-[#3B82F6] hover:text-[#2563EB] transition-colors" title="Edit User">
                             <Edit2 className="w-4 h-4" />
                           </button>
-                          <button onClick={() => confirmDelete(user)} className="text-[#EF4444] hover:text-[#DC2626] transition-colors" title="Hapus User">
+                          <button 
+                            onClick={() => confirmDelete(user)} 
+                            disabled={user.role === 'Owner'}
+                            className={`transition-colors ${
+                              user.role === 'Owner' 
+                                ? 'text-[#CBD5E1] cursor-not-allowed opacity-50' 
+                                : 'text-[#EF4444] hover:text-[#DC2626]'
+                            }`}
+                            title={user.role === 'Owner' ? 'Role Owner tidak dapat dihapus' : 'Hapus User'}
+                          >
                             <Trash2 className="w-4 h-4" />
                           </button>
                         </div>
@@ -271,6 +321,12 @@ export default function UserManagement() {
               </button>
             </div>
             <form onSubmit={handleSave} className="p-5 flex flex-col gap-4">
+              {validationError && (
+                <div className="bg-[#FEE2E2] text-[#DC2626] border border-[#FEE2E2] px-4 py-3 rounded-lg text-xs font-semibold flex items-center gap-2">
+                  <span className="text-sm">⚠️</span>
+                  <span>{validationError}</span>
+                </div>
+              )}
               <div>
                 <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Lengkap <span className="text-[#EF4444]">*</span></label>
                 <input 
@@ -288,24 +344,33 @@ export default function UserManagement() {
                   type="text" 
                   required
                   value={formData.username}
-                  onChange={(e) => setFormData({...formData, username: e.target.value})}
+                  onChange={(e) => {
+                    const sanitized = e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '');
+                    setFormData({...formData, username: sanitized});
+                  }}
                   className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                   placeholder="Contoh: budi_sales"
                 />
               </div>
               <div>
                 <label className="block text-xs font-bold text-[#1E293B] mb-2">Role <span className="text-[#EF4444]">*</span></label>
-                <select 
-                  value={formData.role}
-                  onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
-                >
-                  <option>Admin</option>
-                  <option>Kepala Gudang</option>
-                  <option>Staff Gudang</option>
-                  <option>Owner</option>
-                  <option>Sales</option>
-                </select>
+                {modalMode === 'edit' && users.find(u => u.id === formData.id)?.role === 'Owner' ? (
+                  <div className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#64748B] font-semibold flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-[#EA580C]" />
+                    <span>Owner (Role utama tidak dapat diubah)</span>
+                  </div>
+                ) : (
+                  <select 
+                    value={formData.role}
+                    onChange={(e) => setFormData({...formData, role: e.target.value})}
+                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] bg-white"
+                  >
+                    <option value="Admin">Admin</option>
+                    <option value="Kepala Gudang">Kepala Gudang</option>
+                    <option value="Staff Gudang">Staff Gudang</option>
+                    <option value="Sales">Sales</option>
+                  </select>
+                )}
               </div>
               <div>
                 <label className="block text-xs font-bold text-[#1E293B] mb-2">Status <span className="text-[#EF4444]">*</span></label>

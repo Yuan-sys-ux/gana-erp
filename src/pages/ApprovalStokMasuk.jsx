@@ -1,13 +1,15 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { ShieldCheck, XCircle, CheckCircle2, Clock, Search, Filter } from 'lucide-react';
-import { useState } from 'react';
+import { ShieldCheck, XCircle, CheckCircle2, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { getIncomingStock, updateIncomingStockStatus } from '../utils/mockDb';
 
 export default function ApprovalStokMasuk() {
-  const [approvals, setApprovals] = useState([
-    { id: 'RCV-20260511-01', po: 'PO-2026-001', supplier: 'PT. PLI (Petronas)', date: '11 Mei 2026', items: 2, totalQty: 150, status: 'pending' },
-    { id: 'RCV-20260511-02', po: 'PO-2026-002', supplier: 'PT. ABM (Kixx)', date: '11 Mei 2026', items: 1, totalQty: 50, status: 'pending' },
-    { id: 'RCV-20260510-05', po: 'PO-2026-099', supplier: 'PT. PLI (Petronas)', date: '10 Mei 2026', items: 4, totalQty: 320, status: 'approved' },
-  ]);
+  const [approvals, setApprovals] = useState([]);
+  const [expandedCardId, setExpandedCardId] = useState(null);
+
+  useEffect(() => {
+    setApprovals(getIncomingStock());
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('semua');
@@ -20,11 +22,17 @@ export default function ApprovalStokMasuk() {
   });
 
   const handleApprove = (id) => {
-    setApprovals(approvals.map(a => a.id === id ? { ...a, status: 'approved' } : a));
+    updateIncomingStockStatus(id, 'approved');
+    setApprovals(getIncomingStock());
   };
 
   const handleReject = (id) => {
-    setApprovals(approvals.map(a => a.id === id ? { ...a, status: 'rejected' } : a));
+    updateIncomingStockStatus(id, 'rejected');
+    setApprovals(getIncomingStock());
+  };
+
+  const toggleExpand = (id) => {
+    setExpandedCardId(expandedCardId === id ? null : id);
   };
 
   return (
@@ -79,7 +87,7 @@ export default function ApprovalStokMasuk() {
         {/* Data List */}
         <div className="flex flex-col gap-4">
           {filteredApprovals.map((item, idx) => (
-            <div key={idx} className={`bg-white rounded-2xl shadow-sm border ${item.status === 'pending' ? 'border-[#E2E8F0] hover:border-[#CBD5E1]' : item.status === 'approved' ? 'border-[#BBF7D0] opacity-70' : 'border-[#FECACA] opacity-70'} overflow-hidden transition-all duration-300`}>
+            <div key={idx} className={`bg-white rounded-2xl shadow-sm border ${item.status === 'pending' ? 'border-[#E2E8F0] hover:border-[#CBD5E1]' : item.status === 'approved' ? 'border-[#BBF7D0] opacity-90' : 'border-[#FECACA] opacity-90'} overflow-hidden transition-all duration-300`}>
               <div className="p-5 flex flex-col md:flex-row justify-between items-center gap-6">
                 
                 {/* Info Section */}
@@ -100,7 +108,7 @@ export default function ApprovalStokMasuk() {
                       <span className="text-xs font-bold text-[#64748B] bg-[#F1F5F9] px-2 py-0.5 rounded-full">{item.date}</span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-[#475569]">
-                      <span className="font-semibold text-[#3B82F6]">{item.po}</span>
+                      <span className="font-semibold text-[#3B82F6]">{item.sj}</span>
                       <span className="w-1 h-1 bg-[#CBD5E1] rounded-full"></span>
                       <span>{item.supplier}</span>
                     </div>
@@ -121,7 +129,18 @@ export default function ApprovalStokMasuk() {
                 </div>
 
                 {/* Actions Section */}
-                <div className="flex gap-3 w-full md:w-auto justify-end">
+                <div className="flex gap-3 w-full md:w-auto justify-end items-center">
+                  <button 
+                    onClick={() => toggleExpand(item.id)}
+                    className="px-3.5 py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#475569] font-bold text-xs rounded-xl transition-colors flex items-center gap-1.5"
+                  >
+                    {expandedCardId === item.id ? (
+                      <>Tutup Rincian <ChevronUp className="w-3.5 h-3.5" /></>
+                    ) : (
+                      <>Lihat Rincian <ChevronDown className="w-3.5 h-3.5" /></>
+                    )}
+                  </button>
+
                   {item.status === 'pending' ? (
                     <>
                       <button 
@@ -145,6 +164,49 @@ export default function ApprovalStokMasuk() {
                 </div>
 
               </div>
+
+              {/* Expandable Details Section */}
+              {expandedCardId === item.id && (
+                <div className="bg-[#F8FAFC] border-t border-[#E2E8F0] px-6 py-4 animate-in slide-in-from-top-2 duration-200">
+                  <h4 className="text-xs font-bold text-[#64748B] uppercase tracking-wider mb-3">Daftar Produk Masuk</h4>
+                  <div className="overflow-x-auto border border-[#E2E8F0] rounded-xl bg-white shadow-inner">
+                    <table className="w-full text-left text-xs whitespace-nowrap">
+                      <thead>
+                        <tr className="bg-[#F1F5F9] text-[#475569] font-bold border-b border-[#E2E8F0]">
+                          <th className="py-2.5 px-4">BRAND</th>
+                          <th className="py-2.5 px-4">NAMA PRODUK</th>
+                          <th className="py-2.5 px-4 text-right">QTY MASUK</th>
+                          <th className="py-2.5 px-4">SATUAN</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {item.draftList && item.draftList.length > 0 ? (
+                          item.draftList.map((prod, pIdx) => (
+                            <tr key={pIdx} className="border-b border-[#F1F5F9] last:border-b-0 hover:bg-[#F8FAFC]">
+                              <td className="py-2.5 px-4">
+                                <span className={`px-2 py-0.5 rounded-full text-[9px] font-bold ${
+                                  prod.brand === 'Kixx' ? 'bg-[#FEE2E2] text-[#DC2626]' : 'bg-[#DCFCE7] text-[#16A34A]'
+                                }`}>
+                                  {prod.brand}
+                                </span>
+                              </td>
+                              <td className="py-2.5 px-4 font-semibold text-[#1E293B]">{prod.name}</td>
+                              <td className="py-2.5 px-4 text-right font-bold text-[#1E293B]">{prod.qty}</td>
+                              <td className="py-2.5 px-4 text-[#64748B]">{prod.uom}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan="4" className="py-4 text-center text-[#64748B] font-medium">
+                              Tidak ada rincian produk untuk penerimaan ini.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </div>
           ))}
         </div>
