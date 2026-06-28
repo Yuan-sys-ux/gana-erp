@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, Plus, Edit, Trash2, Package, X } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, Package, X, Loader2, HelpCircle } from 'lucide-react';
+import { productService } from '../services/productService';
 import { getProducts, saveProducts } from '../utils/mockDb';
 
 export default function DataProduk() {
@@ -9,33 +10,70 @@ export default function DataProduk() {
   const [selectedCategory, setSelectedCategory] = useState('Semua Kategori');
   
   const [products, setProducts] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const loadProducts = () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    productService.getAll()
+      .then((res) => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.products || []);
+        setProducts(data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal memuat produk dari API, load lokal:", err);
+        setProducts(getProducts());
+        setIsLoading(false);
+      });
+  };
 
   useEffect(() => {
-    setProducts(getProducts());
+    loadProducts();
   }, []);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [formData, setFormData] = useState({
-    id: '', brand: 'Petronas', name: '', sae: '', kemasan: '4L', kategori: 'Gasoline', harga: 0, stokKarton: '', stokLiter: ''
+    id: '', brand: 'Petronas', name: '', sae: '', kemasan: '4L', kategori: 'Gasoline', harga: 0, stokKarton: '', stokLiter: '', grade: '', tipe_kendaraan: ''
   });
 
   const filteredProducts = products.filter(product => {
+    const name = product.name || product.nama || '';
+    const grade = product.grade || '';
+    const tipe_kendaraan = product.tipe_kendaraan || '';
     const matchBrand = selectedBrand === 'Semua Brand' || product.brand === selectedBrand;
     const matchCategory = selectedCategory === 'Semua Kategori' || product.kategori === selectedCategory;
-    const matchSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const term = searchTerm.toLowerCase();
+    const matchSearch = name.toLowerCase().includes(term) ||
+                        grade.toLowerCase().includes(term) ||
+                        tipe_kendaraan.toLowerCase().includes(term);
     return matchBrand && matchCategory && matchSearch;
   });
 
   const handleOpenModal = (product = null) => {
     if (product) {
       setEditingProduct(product);
-      setFormData(product);
+      setFormData({
+        ...product,
+        name: product.name || product.nama || '',
+        brand: product.brand || 'Petronas',
+        sae: product.sae || '',
+        kemasan: product.kemasan || '4L',
+        kategori: product.kategori || 'Gasoline',
+        harga: product.harga || 0,
+        stokKarton: product.stokKarton || '',
+        stokLiter: product.stokLiter || '',
+        grade: product.grade || '',
+        tipe_kendaraan: product.tipe_kendaraan || ''
+      });
     } else {
       setEditingProduct(null);
       setFormData({
-        id: `PRD-00${products.length + 1}`, brand: 'Petronas', name: '', sae: '', kemasan: '4L', kategori: 'Gasoline', harga: 0, stokKarton: '', stokLiter: ''
+        id: '', brand: 'Petronas', name: '', sae: '', kemasan: '4L', kategori: 'Gasoline', harga: 0, stokKarton: '', stokLiter: '', grade: '', tipe_kendaraan: ''
       });
     }
     setIsModalOpen(true);
@@ -48,15 +86,60 @@ export default function DataProduk() {
 
   const handleSave = (e) => {
     e.preventDefault();
-    let updated;
-    if (editingProduct) {
-      updated = products.map(p => p.id === editingProduct.id ? formData : p);
-    } else {
-      updated = [...products, formData];
-    }
-    setProducts(updated);
-    saveProducts(updated);
-    handleCloseModal();
+    setIsLoading(true);
+    
+    const payload = {
+      ...formData,
+      nama: formData.name,
+    };
+
+    const apiCall = editingProduct
+      ? productService.update(editingProduct.id, payload)
+      : productService.create(payload);
+
+    apiCall
+      .then(() => {
+        loadProducts();
+        handleCloseModal();
+      })
+      .catch((err) => {
+        console.error("Gagal menyimpan produk ke API, simpan lokal:", err);
+        const localProducts = getProducts();
+        if (editingProduct) {
+          const updated = localProducts.map(p => p.id === editingProduct.id ? {
+            ...p,
+            brand: formData.brand,
+            name: formData.name,
+            sae: formData.sae,
+            kemasan: formData.kemasan,
+            kategori: formData.kategori,
+            harga: Number(formData.harga),
+            stokKarton: Number(formData.stokKarton),
+            stokLiter: Number(formData.stokLiter),
+            grade: formData.grade,
+            tipe_kendaraan: formData.tipe_kendaraan
+          } : p);
+          saveProducts(updated);
+        } else {
+          const newProd = {
+            id: `PRD-${Date.now()}`,
+            brand: formData.brand,
+            name: formData.name,
+            sae: formData.sae,
+            kemasan: formData.kemasan,
+            kategori: formData.kategori,
+            harga: Number(formData.harga),
+            stokKarton: Number(formData.stokKarton),
+            stokLiter: Number(formData.stokLiter),
+            grade: formData.grade,
+            tipe_kendaraan: formData.tipe_kendaraan
+          };
+          localProducts.unshift(newProd);
+          saveProducts(localProducts);
+        }
+        loadProducts();
+        handleCloseModal();
+      });
   };
 
   const confirmDelete = (product) => {
@@ -66,11 +149,22 @@ export default function DataProduk() {
 
   const handleDelete = () => {
     if (editingProduct) {
-      const updated = products.filter(p => p.id !== editingProduct.id);
-      setProducts(updated);
-      saveProducts(updated);
-      setIsDeleteModalOpen(false);
-      setEditingProduct(null);
+      setIsLoading(true);
+      productService.delete(editingProduct.id)
+        .then(() => {
+          loadProducts();
+          setIsDeleteModalOpen(false);
+          setEditingProduct(null);
+        })
+        .catch((err) => {
+          console.error("Gagal menghapus produk dari API, hapus lokal:", err);
+          const localProducts = getProducts();
+          const filtered = localProducts.filter(p => p.id !== editingProduct.id);
+          saveProducts(filtered);
+          loadProducts();
+          setIsDeleteModalOpen(false);
+          setEditingProduct(null);
+        });
     }
   };
 
@@ -81,7 +175,7 @@ export default function DataProduk() {
         {/* Header section */}
         <div className="flex justify-between items-end mb-2">
           <div>
-            <h1 className="text-2xl font-bold text-[#1E293B]">Master Produk</h1>
+            <h1 className="text-2xl font-bold text-[#1E293B]">Produk</h1>
             <p className="text-sm text-[#64748B] mt-1">Kelola data oli Kixx & Petronas dengan kategori SAE dan kemasan</p>
           </div>
           <button 
@@ -91,6 +185,43 @@ export default function DataProduk() {
             <Plus className="w-4 h-4" />
             Tambah Produk
           </button>
+        </div>
+
+        {errorMsg && (
+          <div className="w-full bg-[#FEE2E2] text-[#DC2626] text-sm font-semibold p-4 rounded-lg border border-[#FCA5A5]">
+            {errorMsg}
+          </div>
+        )}
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+           <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-5 rounded-xl flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#2563EB] rounded-lg flex items-center justify-center text-white shrink-0">
+                 <Package className="w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-sm font-semibold text-[#1E40AF]">Total Produk Aktif</p>
+                 <h3 className="text-2xl font-bold text-[#1E3A8A]">{products.length}</h3>
+              </div>
+           </div>
+           <div className="bg-[#FEF2F2] border border-[#FECACA] p-5 rounded-xl flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#DC2626] rounded-lg flex items-center justify-center text-white shrink-0">
+                 <Package className="w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-sm font-semibold text-[#991B1B]">Brand Kixx</p>
+                 <h3 className="text-2xl font-bold text-[#7F1D1D]">{products.filter(p => p.brand === 'Kixx').length}</h3>
+              </div>
+           </div>
+           <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-5 rounded-xl flex items-center gap-4">
+              <div className="w-12 h-12 bg-[#16A34A] rounded-lg flex items-center justify-center text-white shrink-0">
+                 <Package className="w-6 h-6" />
+              </div>
+              <div>
+                 <p className="text-sm font-semibold text-[#166534]">Brand Petronas</p>
+                 <h3 className="text-2xl font-bold text-[#14532D]">{products.filter(p => p.brand === 'Petronas').length}</h3>
+              </div>
+           </div>
         </div>
 
         {/* Card wrapper for content */}
@@ -151,76 +282,69 @@ export default function DataProduk() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {filteredProducts.map((product) => (
-                  <tr key={product.id} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
-                    <td className="py-4 px-6">
-                      <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
-                        product.brand === 'Kixx' 
-                          ? 'bg-[#FEE2E2] text-[#DC2626]' 
-                          : 'bg-[#DCFCE7] text-[#16A34A]'
-                      }`}>
-                        {product.brand}
-                      </span>
-                    </td>
-                    <td className="py-4 px-6 text-[#1E293B] font-bold">{product.name}</td>
-                    <td className="py-4 px-6 text-[#64748B]">{product.sae}</td>
-                    <td className="py-4 px-6 text-[#64748B]">{product.kemasan}</td>
-                    <td className="py-4 px-6 text-[#64748B]">{product.kategori}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-[#1E293B]">{product.stokKarton} Karton</span>
-                        <span className="text-xs text-[#94A3B8]">({product.stokLiter} L)</span>
-                      </div>
-                    </td>
-                    <td className="py-4 px-6 text-[#1E293B] font-bold">Rp {Number(product.harga).toLocaleString('id-ID')}</td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center justify-center gap-3">
-                        <button onClick={() => handleOpenModal(product)} className="text-[#0B56A6] hover:text-blue-800 transition-colors">
-                          <Edit className="w-4 h-4" />
-                        </button>
-                        <button onClick={() => confirmDelete(product)} className="text-[#DC2626] hover:text-red-800 transition-colors">
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                {isLoading ? (
+                  <tr>
+                    <td colSpan="8" className="py-8 text-center text-[#64748B]">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#4F46E5]" />
+                        <span>Memuat data produk...</span>
                       </div>
                     </td>
                   </tr>
-                ))}
+                ) : filteredProducts.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="py-8 text-center text-[#64748B]">
+                      Tidak ada produk ditemukan.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredProducts.map((product) => (
+                    <tr key={product.id} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
+                      <td className="py-4 px-6">
+                        <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                          product.brand === 'Kixx' 
+                            ? 'bg-[#FEE2E2] text-[#DC2626]' 
+                            : 'bg-[#DCFCE7] text-[#16A34A]'
+                        }`}>
+                          {product.brand}
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-[#1E293B] font-bold">
+                        <div className="flex flex-col">
+                          <span>{product.name || product.nama}</span>
+                          {product.grade && <span className="text-xs text-[#64748B] font-normal mt-0.5">Grade: {product.grade}</span>}
+                          {product.tipe_kendaraan && <span className="text-xs text-[#94A3B8] font-normal">Tipe: {product.tipe_kendaraan}</span>}
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-[#64748B]">{product.sae}</td>
+                      <td className="py-4 px-6 text-[#64748B]">{product.kemasan}</td>
+                      <td className="py-4 px-6 text-[#64748B]">{product.kategori}</td>
+                      <td className="py-4 px-6">
+                        <div className="flex flex-col">
+                          <span className="font-bold text-[#1E293B]">{product.stokKarton} Karton</span>
+                          <span className="text-xs text-[#94A3B8]">({product.stokLiter} L)</span>
+                        </div>
+                      </td>
+                      <td className="py-4 px-6 text-[#1E293B] font-bold">Rp {Number(product.harga).toLocaleString('id-ID')}</td>
+                      <td className="py-4 px-6">
+                        <div className="flex items-center justify-center gap-3">
+                          <button onClick={() => handleOpenModal(product)} className="text-[#0B56A6] hover:text-blue-800 transition-colors">
+                            <Edit className="w-4 h-4" />
+                          </button>
+                          <button onClick={() => confirmDelete(product)} className="text-[#DC2626] hover:text-red-800 transition-colors">
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>
 
         </div>
 
-        {/* Footer Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
-           <div className="bg-[#EFF6FF] border border-[#BFDBFE] p-5 rounded-xl flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#2563EB] rounded-lg flex items-center justify-center text-white shrink-0">
-                 <Package className="w-6 h-6" />
-              </div>
-              <div>
-                 <p className="text-sm font-semibold text-[#1E40AF]">Total Produk Aktif</p>
-                 <h3 className="text-2xl font-bold text-[#1E3A8A]">{products.length}</h3>
-              </div>
-           </div>
-           <div className="bg-[#FEF2F2] border border-[#FECACA] p-5 rounded-xl flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#DC2626] rounded-lg flex items-center justify-center text-white shrink-0">
-                 <Package className="w-6 h-6" />
-              </div>
-              <div>
-                 <p className="text-sm font-semibold text-[#991B1B]">Brand Kixx</p>
-                 <h3 className="text-2xl font-bold text-[#7F1D1D]">{products.filter(p => p.brand === 'Kixx').length}</h3>
-              </div>
-           </div>
-           <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-5 rounded-xl flex items-center gap-4">
-              <div className="w-12 h-12 bg-[#16A34A] rounded-lg flex items-center justify-center text-white shrink-0">
-                 <Package className="w-6 h-6" />
-              </div>
-              <div>
-                 <p className="text-sm font-semibold text-[#166534]">Brand Petronas</p>
-                 <h3 className="text-2xl font-bold text-[#14532D]">{products.filter(p => p.brand === 'Petronas').length}</h3>
-              </div>
-           </div>
-        </div>
 
       </div>
 
@@ -258,7 +382,15 @@ export default function DataProduk() {
 
               <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-[#334155]">SAE</label>
+                  <div className="flex items-center gap-1">
+                    <label className="text-sm font-semibold text-[#334155]">SAE</label>
+                    <div className="group relative flex items-center">
+                      <HelpCircle className="w-3.5 h-3.5 text-[#94A3B8] hover:text-[#4F46E5] cursor-help" />
+                      <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-[11px] p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 text-left font-normal leading-snug">
+                        Indeks kekentalan oli (contoh: 10W-40, 5W-30). Semakin kecil angka W, semakin encer oli saat dingin.
+                      </div>
+                    </div>
+                  </div>
                   <input type="text" placeholder="e.g. 5W-30" className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
                     value={formData.sae} onChange={e => setFormData({...formData, sae: e.target.value})} required />
                 </div>
@@ -280,15 +412,44 @@ export default function DataProduk() {
                 </div>
               </div>
 
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <div className="flex items-center gap-1">
+                    <label className="text-sm font-semibold text-[#334155]">Grade (e.g. API SN, API CJ-4)</label>
+                    <div className="group relative flex items-center">
+                      <HelpCircle className="w-3.5 h-3.5 text-[#94A3B8] hover:text-[#4F46E5] cursor-help" />
+                      <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-[11px] p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 text-left font-normal leading-snug">
+                        Standar kualitas oli (contoh: API SN, API CJ-4). Menunjukkan performa dan kesesuaian teknologi mesin.
+                      </div>
+                    </div>
+                  </div>
+                  <input type="text" placeholder="e.g. API SN" className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
+                    value={formData.grade || ''} onChange={e => setFormData({...formData, grade: e.target.value})} />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-sm font-semibold text-[#334155]">Tipe Kendaraan</label>
+                  <input type="text" placeholder="e.g. Mobil, Motor, Truk" className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
+                    value={formData.tipe_kendaraan || ''} onChange={e => setFormData({...formData, tipe_kendaraan: e.target.value})} />
+                </div>
+              </div>
+
               <div className="grid grid-cols-3 gap-4">
                 <div className="flex flex-col gap-1.5">
-                  <label className="text-sm font-semibold text-[#334155]">HET</label>
+                  <div className="flex items-center gap-1">
+                    <label className="text-sm font-semibold text-[#334155]">HET</label>
+                    <div className="group relative flex items-center">
+                      <HelpCircle className="w-3.5 h-3.5 text-[#94A3B8] hover:text-[#4F46E5] cursor-help" />
+                      <div className="pointer-events-none absolute bottom-full left-0 mb-2 w-56 bg-slate-800 text-white text-[11px] p-2 rounded-lg shadow-md opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-50 text-left font-normal leading-snug">
+                        Harga Eceran Tertinggi. Harga jual maksimal yang disarankan untuk konsumen akhir.
+                      </div>
+                    </div>
+                  </div>
                   <div className="relative">
                     <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                       <span className="text-[#64748B] text-sm">Rp</span>
                     </div>
                     <input type="text" placeholder="0" className="w-full pl-9 pr-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
-                      value={formData.harga} onChange={e => setFormData({...formData, harga: e.target.value.replace(/\D/g, '')})} required />
+                      value={formData.harga ? Number(formData.harga).toLocaleString('id-ID') : ''} onChange={e => setFormData({...formData, harga: parseInt(e.target.value.replace(/\D/g, ''), 10) || 0})} required />
                   </div>
                 </div>
                 <div className="flex flex-col gap-1.5">

@@ -2,15 +2,13 @@ import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, ShoppingCart, Plus, Minus, Trash2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { getCustomers, addCustomer, addOrder } from '../utils/mockDb';
+import { customerService } from '../services/customerService';
+import { productService } from '../services/productService';
+import { orderService } from '../services/orderService';
 
 export default function InputPesanan() {
   const allProducts = [
-    { id: 1, brand: 'Kixx', name: 'Kixx G1 5W-30', variant: '5W-30', size: '4L', price: 400000, priceFormatted: 'Rp 400.000', stock: 120, headerColor: 'bg-[#EF4444]' },
-    { id: 2, brand: 'Kixx', name: 'Kixx G1 10W-40', variant: '10W-40', size: '4L', price: 380000, priceFormatted: 'Rp 380.000', stock: 95, headerColor: 'bg-[#EF4444]' },
-    { id: 3, brand: 'Petronas', name: 'Syntium 5000 10W-40', variant: '10W-40', size: '4L', price: 420000, priceFormatted: 'Rp 420.000', stock: 150, headerColor: 'bg-[#22C55E]' },
-    { id: 4, brand: 'Petronas', name: 'Syntium 7000 0W-20', variant: '0W-20', size: '4L', price: 520000, priceFormatted: 'Rp 520.000', stock: 80, headerColor: 'bg-[#22C55E]' },
-    { id: 5, brand: 'Kixx', name: 'Kixx HD1 15W-40', variant: '15W-40', size: '5L', price: 270000, priceFormatted: 'Rp 270.000', stock: 200, headerColor: 'bg-[#EF4444]' },
-    { id: 6, brand: 'Petronas', name: 'Urania 3000 15W-40', variant: '15W-40', size: '5L', price: 290000, priceFormatted: 'Rp 290.000', stock: 110, headerColor: 'bg-[#22C55E]' },
+    { id: 1, brand: 'Kixx', name: '[DUMMY] Kixx G1 5W-30', variant: '5W-30', size: '4L', price: 400000, priceFormatted: 'Rp 400.000', stock: 120, headerColor: 'bg-[#EF4444]' },
   ];
 
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,10 +18,76 @@ export default function InputPesanan() {
   
   // State for Bengkel List
   const [bengkels, setBengkels] = useState([]);
+  const [customersList, setCustomersList] = useState([]);
+  const [products, setProducts] = useState(allProducts);
 
   useEffect(() => {
-    const customers = getCustomers();
-    setBengkels(customers.map(c => c.name));
+    // Load customers
+    customerService.getAll()
+      .then(res => {
+        if (res && res.success === false) {
+          console.warn("API pelanggan mengembalikan status gagal, menggunakan fallback pelanggan lokal:", res.message);
+          const localCustomers = getCustomers();
+          setCustomersList(localCustomers);
+          setBengkels(localCustomers.map(c => c.name));
+          return;
+        }
+
+        const data = Array.isArray(res) ? res : (res?.data || res?.customers || []);
+        if (data.length === 0) {
+          const localCustomers = getCustomers();
+          setCustomersList(localCustomers);
+          setBengkels(localCustomers.map(c => c.name));
+          return;
+        }
+
+        setCustomersList(data);
+        setBengkels(data.map(c => c.name || c.nama));
+      })
+      .catch(err => {
+        console.error("Gagal load pelanggan dari API:", err);
+        // Fallback to local
+        const localCustomers = getCustomers();
+        setCustomersList(localCustomers);
+        setBengkels(localCustomers.map(c => c.name));
+      });
+
+    // Load products
+    productService.getAll()
+      .then(res => {
+        if (res && res.success === false) {
+          console.warn("API produk mengembalikan status gagal, menggunakan fallback produk lokal:", res.message);
+          setProducts(allProducts);
+          return;
+        }
+
+        const data = Array.isArray(res) ? res : (res?.data || res?.products || []);
+        if (data.length === 0) {
+          console.warn("Daftar produk API kosong, menggunakan fallback produk lokal");
+          setProducts(allProducts);
+          return;
+        }
+
+        // Map backend properties to UI properties
+        const mapped = data.map(p => ({
+          id: p.id,
+          brand: p.brand || 'Petronas',
+          name: p.nama || p.name,
+          variant: p.sae || '',
+          size: p.kemasan || '',
+          price: Number(p.harga) || 0,
+          priceFormatted: `Rp ${(Number(p.harga) || 0).toLocaleString('id-ID')}`,
+          stock: Number(p.stokKarton) || 0,
+          headerColor: p.brand === 'Kixx' ? 'bg-[#EF4444]' : 'bg-[#22C55E]',
+          grade: p.grade || '',
+          tipe_kendaraan: p.tipe_kendaraan || ''
+        }));
+        setProducts(mapped);
+      })
+      .catch(err => {
+        console.error("Gagal load produk dari API, menggunakan fallback produk lokal:", err);
+        setProducts(allProducts);
+      });
   }, []);
   const [isAddBengkelOpen, setIsAddBengkelOpen] = useState(false);
   const [newCustomerForm, setNewCustomerForm] = useState({
@@ -51,32 +115,56 @@ export default function InputPesanan() {
   const handleAddBengkel = (e) => {
     e.preventDefault();
     if(newCustomerForm.name.trim()) {
-      const newCustomer = {
-        id: `PLG-NEW-${Date.now()}`,
-        name: newCustomerForm.name,
-        address: newCustomerForm.address || '-',
-        phone: newCustomerForm.phone || '-',
-        outstanding: 0,
-        lastOrder: '-',
-        status: 'Active',
-        city: newCustomerForm.city || 'Banjarmasin'
+      const payload = {
+        nama: newCustomerForm.name,
+        alamat: newCustomerForm.address || '-',
+        telepon: newCustomerForm.phone || '-',
+        piutang: 0,
+        kota: newCustomerForm.city || 'Banjarmasin',
+        status: 'Active'
       };
-      addCustomer(newCustomer);
-      setBengkels([...bengkels, newCustomerForm.name]);
-      setSelectedBengkel(newCustomerForm.name);
-      setNewCustomerForm({ name: '', address: '', phone: '', city: 'Banjarmasin' });
-      setIsAddBengkelOpen(false);
+
+      customerService.create(payload)
+        .then((res) => {
+          const newCustomer = res?.data || res;
+          const name = newCustomer.nama || newCustomer.name || newCustomerForm.name;
+          setCustomersList(prev => [...prev, newCustomer]);
+          setBengkels(prev => [...prev, name]);
+          setSelectedBengkel(name);
+          setNewCustomerForm({ name: '', address: '', phone: '', city: 'Banjarmasin' });
+          setIsAddBengkelOpen(false);
+          showAlert('success', 'Pelanggan Ditambahkan', `Bengkel ${name} berhasil ditambahkan ke database.`);
+        })
+        .catch(err => {
+          console.error("Gagal menambahkan pelanggan ke API, memakai lokal:", err);
+          const newCustomer = {
+            id: `PLG-NEW-${Date.now()}`,
+            name: newCustomerForm.name,
+            address: newCustomerForm.address || '-',
+            phone: newCustomerForm.phone || '-',
+            outstanding: 0,
+            lastOrder: '-',
+            status: 'Active',
+            city: newCustomerForm.city || 'Banjarmasin'
+          };
+          addCustomer(newCustomer);
+          setCustomersList(prev => [...prev, newCustomer]);
+          setBengkels([...bengkels, newCustomerForm.name]);
+          setSelectedBengkel(newCustomerForm.name);
+          setNewCustomerForm({ name: '', address: '', phone: '', city: 'Banjarmasin' });
+          setIsAddBengkelOpen(false);
+        });
     }
   };
 
   // Filtering Logic
   const filteredProducts = useMemo(() => {
-    return allProducts.filter(p => {
+    return products.filter(p => {
       const matchSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase());
       const matchBrand = activeFilter === 'Semua' || p.brand === activeFilter;
       return matchSearch && matchBrand;
     });
-  }, [searchTerm, activeFilter]);
+  }, [products, searchTerm, activeFilter]);
 
   // Cart Functions
   const addToCart = (product) => {
@@ -114,28 +202,57 @@ export default function InputPesanan() {
       return;
     }
     
-    let paymentInfo = paymentMethod === 'cash' ? 'Cash / Tunai' : `Tempo (${tempoDays} Hari)`;
-    
+    let paymentInfo = paymentMethod === 'cash' ? 'Tunai' : `Tempo (${tempoDays} Hari)`;
     const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
-    const customerObj = getCustomers().find(c => c.name === selectedBengkel);
-    const customerAddress = customerObj ? customerObj.address : '-';
+    const customerObj = customersList.find(c => (c.name || c.nama) === selectedBengkel);
+    const customerAddress = customerObj ? (customerObj.address || customerObj.alamat) : '-';
+    const customerId = customerObj ? customerObj.id : null;
 
-    const newOrder = {
-      customer: selectedBengkel,
-      sales: 'Sales System', // Mock sales name
-      total: cartTotal,
-      status: 'Draft',
-      qty: totalQty,
-      address: customerAddress,
-      paymentMethod: paymentMethod
+    // Build payload for backend API
+    const orderPayload = {
+      pelanggan_id: customerId,
+      sales_id: localStorage.getItem('userId') ? Number(localStorage.getItem('userId')) : null,
+      metode_bayar: paymentMethod,
+      total_netto: cartTotal,
+      dataDetail: cart.map(item => ({
+        produk_id: item.id,
+        qty: item.qty,
+        harga: item.price
+      }))
     };
-    
-    addOrder(newOrder);
 
-    showAlert('success', 'Pesanan Berhasil!', `Pesanan untuk ${selectedBengkel} senilai Rp ${cartTotal.toLocaleString('id-ID')} telah dibuat dengan metode ${paymentInfo}. Pesanan ini sekarang masuk status "Draft" di Admin.`);
-    setCart([]);
-    setSelectedBengkel('');
-    setPaymentMethod('cash');
+    orderService.create(orderPayload)
+      .then(() => {
+        showAlert('success', 'Pesanan Berhasil!', `Pesanan untuk ${selectedBengkel} senilai Rp ${cartTotal.toLocaleString('id-ID')} telah berhasil diproses.`);
+        setCart([]);
+        setSelectedBengkel('');
+        setPaymentMethod('cash');
+      })
+      .catch(err => {
+        console.error("Gagal mengirim pesanan ke API, menyimpan ke lokal:", err);
+        // Fallback to local mockDb
+        const newOrder = {
+          customer: selectedBengkel,
+          sales: 'Sales System',
+          total: cartTotal,
+          status: 'Draft',
+          qty: totalQty,
+          address: customerAddress,
+          paymentMethod: paymentMethod,
+          items: cart.map(item => ({
+            id: item.id,
+            name: item.name || item.nama,
+            brand: item.brand,
+            qty: item.qty,
+            price: item.price
+          }))
+        };
+        addOrder(newOrder);
+        showAlert('success', 'Pesanan Disimpan Lokal!', `Gagal menghubungi API backend. Pesanan berhasil disimpan secara lokal untuk ${selectedBengkel} senilai Rp ${cartTotal.toLocaleString('id-ID')}.`);
+        setCart([]);
+        setSelectedBengkel('');
+        setPaymentMethod('cash');
+      });
   };
 
   return (
@@ -143,7 +260,7 @@ export default function InputPesanan() {
       <div className="flex flex-col gap-6 relative">
         
         <div>
-          <h2 className="text-xl font-bold text-[#1E293B]">Quick Order Form</h2>
+          <h2 className="text-xl font-bold text-[#1E293B]">Formulir Pesanan Cepat</h2>
           <p className="text-sm text-[#64748B] mt-1">Input pesanan cepat untuk bengkel</p>
         </div>
 
@@ -279,7 +396,7 @@ export default function InputPesanan() {
           <div className="flex-1 flex flex-col gap-4">
             
             {/* Search and Filters */}
-            <div className="bg-white p-5 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] flex flex-col gap-4 sticky top-0 z-10">
+            <div className="bg-white p-5 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] flex flex-col gap-4 sticky top-[80px] z-10">
               <div className="relative">
                 <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
                 <input 
@@ -317,9 +434,11 @@ export default function InputPesanan() {
                     </div>
                     <div className="p-4 flex-1 flex flex-col">
                       <h4 className="font-bold text-[#1E293B] mb-2">{p.name}</h4>
-                      <div className="flex items-center gap-2 mb-4">
+                      <div className="flex flex-wrap items-center gap-2 mb-4">
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F8FAFC] border border-[#E2E8F0] text-[#64748B]">{p.variant}</span>
                         <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F8FAFC] border border-[#E2E8F0] text-[#64748B]">{p.size}</span>
+                        {p.grade && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5]">{p.grade}</span>}
+                        {p.tipe_kendaraan && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F0FDF4] border border-[#BBF7D0] text-[#16A34A]">{p.tipe_kendaraan}</span>}
                       </div>
                       
                       <div className="mt-auto mb-4">
@@ -346,7 +465,7 @@ export default function InputPesanan() {
           </div>
 
           {/* Right Column: Cart */}
-          <div className="w-full lg:w-[360px] bg-white rounded-xl shadow-xl border border-[#E2E8F0] overflow-hidden sticky top-6 z-20">
+          <div className="w-full lg:w-[360px] bg-white rounded-xl shadow-xl border border-[#E2E8F0] overflow-hidden sticky top-[80px] z-20">
             <div className="bg-gradient-to-r from-[#6366F1] to-[#A855F7] p-4 text-white flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <ShoppingCart className="w-5 h-5" />
@@ -408,7 +527,7 @@ export default function InputPesanan() {
                           : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
                       }`}
                     >
-                      Cash / Tunai
+                      Tunai
                     </button>
                     <button 
                       onClick={() => setPaymentMethod('tempo')}

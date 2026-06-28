@@ -1,7 +1,9 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { PackagePlus, Save, Trash2, Search, CheckCircle2, AlertCircle } from 'lucide-react';
-import { useState, useMemo } from 'react';
+import { PackagePlus, Save, Trash2, Search, CheckCircle2, AlertCircle, Edit2, X } from 'lucide-react';
+import { useState, useMemo, useEffect } from 'react';
 import { addIncomingStock } from '../utils/mockDb';
+import { purchaseService } from '../services/purchaseService';
+import { productService } from '../services/productService';
 
 const PRODUCTS = [
   { id: 1, brand: 'Kixx', name: 'Kixx G1 5W-30' },
@@ -15,15 +17,63 @@ const PRODUCTS = [
 ];
 
 export default function InputStokMasuk() {
-  const [sjNumber, setSjNumber] = useState('');
-  const [supplier, setSupplier] = useState('');
+  const [products, setProducts] = useState(PRODUCTS);
+  const [sjNumber, setSjNumber] = useState(() => localStorage.getItem('gana_incoming_stock_sj') || '');
+  const [supplier, setSupplier] = useState(() => localStorage.getItem('gana_incoming_stock_supplier') || '');
   const [selectedProductId, setSelectedProductId] = useState('');
   const [qty, setQty] = useState('');
   const [uom, setUom] = useState('Karton');
-  const [draftItems, setDraftItems] = useState([]);
+  const [draftItems, setDraftItems] = useState(() => {
+    const saved = localStorage.getItem('gana_incoming_stock_draft');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Fetch products from database
+  useEffect(() => {
+    productService.getAll()
+      .then(res => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.products || []);
+        if (data.length > 0) {
+          setProducts(data);
+        }
+      })
+      .catch(err => {
+        console.error("Gagal memuat produk dari API, gunakan mock lokal:", err);
+      });
+  }, []);
+
+  // Persist state changes to localStorage
+  useEffect(() => {
+    localStorage.setItem('gana_incoming_stock_draft', JSON.stringify(draftItems));
+  }, [draftItems]);
+
+  useEffect(() => {
+    localStorage.setItem('gana_incoming_stock_sj', sjNumber);
+  }, [sjNumber]);
+
+  useEffect(() => {
+    localStorage.setItem('gana_incoming_stock_supplier', supplier);
+  }, [supplier]);
+  
+  // Modal Edit State
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState(null);
+  const [editQty, setEditQty] = useState('');
+  const [editUom, setEditUom] = useState('Karton');
   
   // Search text for filtering products dropdown
   const [searchProductTerm, setSearchProductTerm] = useState('');
+
+  // Calculate formatted total volume dynamically based on UOM
+  const formattedTotalVolume = useMemo(() => {
+    const totals = {};
+    draftItems.forEach(item => {
+      totals[item.uom] = (totals[item.uom] || 0) + item.qty;
+    });
+    
+    const parts = Object.entries(totals).map(([uom, qty]) => `${qty} ${uom}`);
+    return parts.length > 0 ? parts.join(', ') : '0 Karton';
+  }, [draftItems]);
 
   // Notification State
   const [alert, setAlert] = useState({ isOpen: false, type: 'success', title: '', message: '' });
@@ -38,7 +88,7 @@ export default function InputStokMasuk() {
 
   // Filter products by brand and search term
   const availableProducts = useMemo(() => {
-    return PRODUCTS.filter(p => {
+    return products.filter(p => {
       // Filter by supplier brand
       if (supplier === 'PT. PLI (Petronas)' && p.brand !== 'Petronas') return false;
       if (supplier === 'PT. ABM (Kixx)' && p.brand !== 'Kixx') return false;
@@ -46,7 +96,7 @@ export default function InputStokMasuk() {
       // Filter by search term
       return p.name.toLowerCase().includes(searchProductTerm.toLowerCase());
     });
-  }, [supplier, searchProductTerm]);
+  }, [supplier, searchProductTerm, products]);
 
   const handleAddToDraft = (e) => {
     e.preventDefault();
@@ -67,7 +117,7 @@ export default function InputStokMasuk() {
       return;
     }
 
-    const product = PRODUCTS.find(p => p.id === parseInt(selectedProductId));
+    const product = products.find(p => String(p.id) === String(selectedProductId));
     if (!product) return;
 
     // Check if product already exists in draft
@@ -93,6 +143,30 @@ export default function InputStokMasuk() {
 
   const handleDeleteDraftItem = (id) => {
     setDraftItems(draftItems.filter(item => item.id !== id));
+  };
+
+  const openEditModal = (item) => {
+    setEditingItem(item);
+    setEditQty(item.qty);
+    setEditUom(item.uom);
+    setIsEditModalOpen(true);
+  };
+
+  const handleUpdateItem = (e) => {
+    e.preventDefault();
+    const parsedQty = parseInt(editQty);
+    if (isNaN(parsedQty) || parsedQty <= 0) {
+      showAlert('error', 'Gagal', 'Jumlah Qty masuk harus lebih besar dari 0.');
+      return;
+    }
+
+    setDraftItems(draftItems.map(item => 
+      item.id === editingItem.id 
+        ? { ...item, qty: parsedQty, uom: editUom } 
+        : item
+    ));
+    setIsEditModalOpen(false);
+    setEditingItem(null);
   };
 
   const handleSubmitToKepalaGudang = () => {
@@ -121,21 +195,37 @@ export default function InputStokMasuk() {
       draftList: draftItems
     };
 
-    addIncomingStock(receipt);
+    purchaseService.create(receipt)
+      .then(() => {
+        showAlert(
+          'success',
+          'Berhasil Dikirim!',
+          `Penerimaan barang dengan No. Surat Jalan "${sjNumber}" senilai total ${totalQty} Karton berhasil dikirim ke Kepala Gudang untuk disetujui.`
+        );
 
-    showAlert(
-      'success',
-      'Berhasil Dikirim!',
-      `Penerimaan barang dengan No. Surat Jalan "${sjNumber}" senilai total ${totalQty} Karton berhasil dikirim ke Kepala Gudang untuk disetujui.`
-    );
-
-    // Reset Form
-    setDraftItems([]);
-    setSjNumber('');
-    setSupplier('');
-    setSelectedProductId('');
-    setQty('');
-    setSearchProductTerm('');
+        // Reset Form
+        setDraftItems([]);
+        setSjNumber('');
+        setSupplier('');
+        setSelectedProductId('');
+        setQty('');
+        setSearchProductTerm('');
+      })
+      .catch(err => {
+        console.error("Gagal menyimpan ke database, fallback lokal:", err);
+        addIncomingStock(receipt);
+        showAlert(
+          'success',
+          'Berhasil Dikirim!',
+          `Penerimaan barang dengan No. Surat Jalan "${sjNumber}" senilai total ${totalQty} Karton berhasil dikirim ke Kepala Gudang untuk disetujui.`
+        );
+        setDraftItems([]);
+        setSjNumber('');
+        setSupplier('');
+        setSelectedProductId('');
+        setQty('');
+        setSearchProductTerm('');
+      });
   };
 
   return (
@@ -315,12 +405,22 @@ export default function InputStokMasuk() {
                       <td className="py-4 px-6 text-center font-bold text-[#1E293B]">{item.qty}</td>
                       <td className="py-4 px-6 text-center text-[#64748B]">{item.uom}</td>
                       <td className="py-4 px-6 text-center">
-                        <button 
-                          onClick={() => handleDeleteDraftItem(item.id)}
-                          className="text-[#EF4444] hover:text-[#B91C1C] transition-colors p-1.5 rounded-md hover:bg-[#FEE2E2]"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center justify-center gap-2">
+                          <button 
+                            onClick={() => openEditModal(item)}
+                            className="text-[#3B82F6] hover:text-[#2563EB] transition-colors p-1.5 rounded-md hover:bg-[#EFF6FF]"
+                            title="Edit Item"
+                          >
+                            <Edit2 className="w-4 h-4" />
+                          </button>
+                          <button 
+                            onClick={() => handleDeleteDraftItem(item.id)}
+                            className="text-[#EF4444] hover:text-[#B91C1C] transition-colors p-1.5 rounded-md hover:bg-[#FEE2E2]"
+                            title="Hapus Item"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -338,7 +438,7 @@ export default function InputStokMasuk() {
             <div className="p-6 border-t border-[#E2E8F0] bg-[#F8FAFC]">
               <div className="flex justify-between items-center">
                 <span className="text-sm font-semibold text-[#64748B]">Total Volume Draft</span>
-                <span className="text-xl font-black text-[#1E293B]">{draftItems.reduce((acc, curr) => acc + curr.qty, 0)} Karton</span>
+                <span className="text-xl font-black text-[#1E293B]">{formattedTotalVolume}</span>
               </div>
             </div>
           </div>
@@ -346,6 +446,76 @@ export default function InputStokMasuk() {
         </div>
 
       </div>
+
+      {/* Modal Edit Item Draft */}
+      {isEditModalOpen && editingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-[#E2E8F0]">
+              <h3 className="font-bold text-lg text-[#1E293B]">Edit Item Draft</h3>
+              <button 
+                onClick={() => { setIsEditModalOpen(false); setEditingItem(null); }} 
+                className="text-[#94A3B8] hover:text-[#1E293B] transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdateItem} className="p-5 flex flex-col gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#64748B] mb-1.5">Produk</label>
+                <div className="w-full bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#1E293B] font-semibold">
+                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full mr-2 inline-block ${editingItem.brand === 'Kixx' ? 'bg-[#FEE2E2] text-[#DC2626]' : 'bg-[#DCFCE7] text-[#16A34A]'}`}>
+                    {editingItem.brand}
+                  </span>
+                  {editingItem.name}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#1E293B]">Qty Masuk <span className="text-[#EF4444]">*</span></label>
+                  <input 
+                    type="number" 
+                    value={editQty}
+                    onChange={e => setEditQty(e.target.value)}
+                    placeholder="0" 
+                    min="1"
+                    className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                    required
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-bold text-[#1E293B]">Satuan <span className="text-[#EF4444]">*</span></label>
+                  <select 
+                    value={editUom}
+                    onChange={e => setEditUom(e.target.value)}
+                    className="w-full px-3 py-2.5 border border-[#E2E8F0] rounded-lg text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] bg-white"
+                  >
+                    <option value="Karton">Karton</option>
+                    <option value="Drum">Drum</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#E2E8F0]">
+                <button 
+                  type="button" 
+                  onClick={() => { setIsEditModalOpen(false); setEditingItem(null); }}
+                  className="px-4 py-2 text-sm font-semibold text-[#64748B] hover:text-[#1E293B] transition-colors"
+                >
+                  Batal
+                </button>
+                <button 
+                  type="submit" 
+                  className="px-5 py-2 bg-[#4F46E5] text-white rounded-lg text-sm font-semibold hover:bg-[#4338CA] transition-colors"
+                >
+                  Simpan Perubahan
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

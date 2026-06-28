@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Loader2, Building2 } from 'lucide-react';
+import api from '../utils/api';
 
 export default function Login() {
   const [username, setUsername] = useState('');
@@ -9,42 +10,84 @@ export default function Login() {
   const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
+  // Fungsi pembantu untuk menebak/menentukan role dari username (jika backend mewajibkan field 'role' saat login)
+  const getRoleFromUsername = (uname) => {
+    const u = uname.toLowerCase();
+    if (u.includes('admin')) return 'admin';
+    if (u.includes('kepala') || u.includes('gudang')) return 'kepala_gudang';
+    if (u.includes('staff')) return 'staff_gudang';
+    if (u.includes('owner')) return 'owner';
+    if (u.includes('sales')) return 'sales';
+    return 'admin'; // fallback default
+  };
+
   const handleLogin = (e) => {
     e.preventDefault();
     if (!username || !password) return;
     setErrorMsg('');
-
     setIsLoading(true);
 
-    // Mock Authentication Logic
-    // Valid Credentials Dictionary
-    const validUsers = {
-      'admin': { pass: 'admin123', role: 'admin', fullName: 'Admin' },
-      'kepala': { pass: 'gudang123', role: 'kepala_gudang', fullName: 'Kepala Gudang' },
-      'staff': { pass: 'staff123', role: 'staff_gudang', fullName: 'Staff Gudang' },
-      'owner': { pass: 'owner123', role: 'owner', fullName: 'Owner' },
-      'sales': { pass: 'sales123', role: 'sales', fullName: 'Sales' }
+    const userRole = getRoleFromUsername(username);
+
+    // Daftar kredensial dummy/demo untuk fallback login lokal
+    const dummyUsers = {
+      admin: { password: 'admin123', role: 'admin', name: 'Admin Demo' },
+      kepala: { password: 'gudang123', role: 'kepala_gudang', name: 'Kepala Gudang Demo' },
+      staff: { password: 'staff123', role: 'staff_gudang', name: 'Staff Gudang Demo' },
+      owner: { password: 'owner123', role: 'owner', name: 'Owner Demo' },
+      sales: { password: 'sales123', role: 'sales', name: 'Sales Demo' }
     };
 
-    const userKey = username.toLowerCase();
-    const validUser = validUsers[userKey];
+    const normalizedUsername = username.toLowerCase();
+    const isDummy = dummyUsers[normalizedUsername] && dummyUsers[normalizedUsername].password === password;
 
-    if (!validUser || validUser.pass !== password) {
-      setTimeout(() => {
+    // Kirim request login ke backend ngrok sesuai endpoint /api/auth/login
+    api.post('/api/auth/login', { 
+      username, 
+      password,
+      role: userRole
+    })
+      .then((res) => {
+        // Mengambil token dan data user dari response Axios sesuai struktur backend Anda
+        const { token, data } = res.data;
+        const { role, nama } = data;
+
+        if (role) {
+          localStorage.setItem('userRole', role);
+        }
+        if (nama) {
+          localStorage.setItem('userFullName', nama);
+        }
+        if (token) {
+          localStorage.setItem('userToken', token);
+        }
+        const userId = data?.id || data?.id_sales || data?.userId || '';
+        if (userId) {
+          localStorage.setItem('userId', userId);
+        }
+
         setIsLoading(false);
-        setErrorMsg('Username atau password salah!');
-      }, 600);
-      return;
-    }
+        navigate('/dashboard');
+      })
+      .catch((err) => {
+        // Fallback ke login lokal jika backend offline/gagal tetapi menggunakan kredensial dummy yang valid
+        if (isDummy) {
+          const dummyInfo = dummyUsers[normalizedUsername];
+          localStorage.setItem('userRole', dummyInfo.role);
+          localStorage.setItem('userFullName', dummyInfo.name);
+          localStorage.setItem('userToken', 'dummy-local-token-' + dummyInfo.role);
+          localStorage.setItem('userId', 'dummy-sales-id');
 
-    // Save to localStorage
-    localStorage.setItem('userRole', validUser.role);
-    localStorage.setItem('userFullName', validUser.fullName);
+          setIsLoading(false);
+          navigate('/dashboard');
+          return;
+        }
 
-    setTimeout(() => {
-      setIsLoading(false);
-      navigate('/dashboard');
-    }, 1000);
+        setIsLoading(false);
+        // Menampilkan pesan error dari backend jika ada, atau default error
+        const errorMessage = err.response?.data?.message || 'Username atau password salah!';
+        setErrorMsg(errorMessage);
+      });
   };
 
   return (
@@ -102,18 +145,6 @@ export default function Login() {
               'Masuk'
             )}
           </button>
-
-          {/* Demo Credentials Reminder */}
-          <div className="mt-6 bg-[#F8FAFC] rounded-lg p-4 border border-[#E2E8F0]">
-            <p className="text-[11px] text-center font-semibold text-[#94A3B8] mb-2 uppercase tracking-wide">Demo Credentials:</p>
-            <ul className="text-xs text-center text-[#475569] space-y-1 font-medium">
-              <li><span className="font-bold text-[#1E293B]">admin</span> / admin123 - Admin</li>
-              <li><span className="font-bold text-[#1E293B]">kepala</span> / gudang123 - Kepala Gudang</li>
-              <li><span className="font-bold text-[#1E293B]">staff</span> / staff123 - Staff Gudang</li>
-              <li><span className="font-bold text-[#1E293B]">owner</span> / owner123 - Owner</li>
-              <li><span className="font-bold text-[#1E293B]">sales</span> / sales123 - Sales</li>
-            </ul>
-          </div>
         </form>
 
         <div className="mt-8 text-center pt-5 w-full">

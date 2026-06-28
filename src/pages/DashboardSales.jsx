@@ -1,41 +1,207 @@
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
-import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award, AlertTriangle } from 'lucide-react';
+import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award, AlertTriangle, Loader2, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { targetService } from '../services/targetService';
+import { userService } from '../services/userService';
+import api from '../utils/api';
+import { getOrders } from '../utils/mockDb';
 
 export default function DashboardSales() {
+  const [targetData, setTargetData] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [salesName, setSalesName] = useState(() => localStorage.getItem('userFullName') || 'Sales');
+  const [warnings, setWarnings] = useState([]);
+  const [dismissedWarnings, setDismissedWarnings] = useState([]);
+
+  const loadWarnings = () => {
+    api.get('/api/owner/monitoring-piutang')
+      .then(res => {
+        if (res.data && res.data.success && res.data.list) {
+          processWarnings(res.data.list);
+        } else {
+          fallbackLocalWarnings();
+        }
+      })
+      .catch(() => {
+        fallbackLocalWarnings();
+      });
+  };
+
+  const processWarnings = (list) => {
+    const active = list.map(item => {
+      let daysLeft = item.days;
+      if (item.status === 'overdue') {
+        daysLeft = -Math.abs(item.days);
+      }
+      return {
+        id: item.id,
+        customer: item.customer,
+        amount: item.amount,
+        days: daysLeft,
+        status: item.status
+      };
+    }).filter(item => item.days <= 7);
+    setWarnings(active);
+  };
+
+  const fallbackLocalWarnings = () => {
+    const orders = getOrders();
+    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    const parseDueDate = (dateStr) => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split(' ');
+      if (parts.length < 3) return new Date();
+      const day = parseInt(parts[0]);
+      const monthName = parts[1];
+      const year = parseInt(parts[2]);
+      const monthIdx = monthsId.indexOf(monthName);
+      return new Date(year, monthIdx, day);
+    };
+
+    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
+    const now = new Date(2026, 5, 12); // 12 June 2026
+
+    const list = unpaidOrders.map(o => {
+      const dueDateObj = parseDueDate(o.dueDate);
+      const diffTime = dueDateObj.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let status = 'safe';
+      let days = diffDays;
+
+      if (diffDays < 0) {
+        status = 'overdue';
+        days = diffDays;
+      } else if (diffDays <= 7) {
+        status = 'warning';
+        days = diffDays;
+      } else {
+        status = 'safe';
+        days = diffDays;
+      }
+
+      return {
+        id: o.id_transaksi || o.invoiceId || `INV-${o.id}`,
+        customer: o.customer,
+        amount: Number(o.total || 0),
+        days,
+        status
+      };
+    });
+
+    const active = list.filter(item => item.days <= 7);
+    setWarnings(active);
+  };
+
+  const fetchTarget = (salesId = null) => {
+    setIsLoading(true);
+    const d = new Date();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const yyyy = d.getFullYear();
+    const bulan = `${yyyy}-${mm}`;
+
+    const params = { bulan };
+    if (salesId) {
+      params.sales_id = salesId;
+    }
+
+    targetService.get(params)
+      .then((res) => {
+        if (res.success && res.data) {
+          setTargetData(res.data);
+        }
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal load target penjualan untuk dashboard sales:", err);
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    setSalesName(localStorage.getItem('userFullName') || 'Sales');
+    loadWarnings();
+
+    const userId = localStorage.getItem('userId');
+    if (userId && userId !== 'dummy-sales-id') {
+      fetchTarget(userId);
+    } else {
+      // Fallback
+      userService.getSales()
+        .then((res) => {
+          const list = Array.isArray(res) ? res : (res?.data || res?.sales || []);
+          const currentName = localStorage.getItem('userFullName');
+          const matched = list.find(s => 
+            (s.nama || s.nama_sales || s.name || '').toLowerCase() === (currentName || '').toLowerCase()
+          );
+          if (matched) {
+            const resolvedId = matched.id || matched.id_sales;
+            localStorage.setItem('userId', resolvedId);
+            fetchTarget(resolvedId);
+          } else {
+            fetchTarget();
+          }
+        })
+        .catch((err) => {
+          console.error("Gagal load sales list fallback di dashboard:", err);
+          fetchTarget();
+        });
+    }
+  }, []);
+
+  const pct = targetData ? Math.min(Math.round(((targetData.achievedRevenue || 0) / (targetData.targetRevenue || 1)) * 100), 100) : 0;
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
         
         {/* Title Section */}
         <div>
-          <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Sales - Fernando</h2>
-          <p className="text-xs text-[#64748B] mt-1">Mobile field work & order management</p>
+          <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Sales - {salesName}</h2>
+          <p className="text-xs text-[#64748B] mt-1">Manajemen pesanan & pekerjaan lapangan mobile</p>
         </div>
 
-        {/* Tempo Alert Banner */}
-        <div className="bg-gradient-to-r from-[#FEF2F2] to-white border border-[#FECACA] rounded-xl p-4 flex flex-col sm:flex-row sm:items-center gap-4 shadow-sm relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-1 h-full bg-[#DC2626]"></div>
-          <div className="w-10 h-10 rounded-full bg-[#FEE2E2] flex items-center justify-center shrink-0">
-            <AlertTriangle className="w-5 h-5 text-[#DC2626] animate-pulse" />
+        {/* Right-aligned Warning Notification Bar */}
+        {warnings.length > 0 && (
+          <div className="fixed top-20 right-6 z-50 w-80 flex flex-col gap-3">
+            {warnings
+              .filter(w => !dismissedWarnings.includes(w.id))
+              .map(warn => {
+                const isUrgent = warn.days <= 3;
+                return (
+                  <div key={warn.id} className={`p-4 rounded-xl shadow-lg border relative overflow-hidden bg-white animate-in slide-in-from-right duration-300 ${isUrgent ? 'border-red-200' : 'border-amber-200'}`}>
+                    <div className={`absolute top-0 left-0 w-1.5 h-full ${isUrgent ? 'bg-[#DC2626]' : 'bg-[#EAB308]'}`}></div>
+                    <button onClick={() => setDismissedWarnings(prev => [...prev, warn.id])} className="absolute top-2.5 right-2.5 text-gray-400 hover:text-gray-600 transition-colors">
+                      <X className="w-4 h-4" />
+                    </button>
+                    <div className="flex gap-2.5 items-start">
+                      <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-[#DC2626] animate-pulse' : 'text-[#EAB308]'}`} />
+                      <div className="pr-5 flex-1">
+                        <h4 className={`font-bold text-xs ${isUrgent ? 'text-[#991B1B]' : 'text-[#854D0E]'}`}>Peringatan Jatuh Tempo!</h4>
+                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                          Bengkel <span className="font-bold">{warn.customer}</span> {warn.days < 0 ? `telah menunggak selama ${Math.abs(warn.days)} hari` : `jatuh tempo dalam ${warn.days} hari`} (Rp {warn.amount.toLocaleString('id-ID')}).
+                        </p>
+                        <div className="mt-2.5">
+                          <Link to="/monitoring-piutang" className={`inline-block px-3 py-1 rounded text-[10px] font-bold text-white transition-colors ${isUrgent ? 'bg-[#DC2626] hover:bg-[#B91C1C]' : 'bg-[#EAB308] hover:bg-[#CA8A04]'}`}>
+                            Lihat Detail
+                          </Link>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
           </div>
-          <div className="flex-1">
-            <h3 className="font-bold text-[#991B1B] text-sm sm:text-base">Peringatan Jatuh Tempo!</h3>
-            <p className="text-xs sm:text-sm text-[#B91C1C] mt-0.5">
-              Bengkel <span className="font-bold">Berkah Sekawan Motor</span> menunggak tagihan selama 5 hari (Rp 15.400.000). Harap segera lakukan penagihan pada kunjungan berikutnya.
-            </p>
-          </div>
-          <Link to="/monitoring-piutang" className="bg-[#DC2626] text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-[#B91C1C] transition-colors whitespace-nowrap text-center sm:w-auto w-full">
-            Lihat Detail
-          </Link>
-        </div>
+        )}
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard 
             title="Target Bulan Ini" 
-            value="Rp 50.000.000" 
+            value={isLoading ? "Memuat..." : targetData ? `Rp ${Number(targetData.targetRevenue || 0).toLocaleString('id-ID')}` : "Rp 0"} 
             icon={<Target className="w-5 h-5" />} 
             bgClass="bg-[#3B82F6]"
           />
@@ -44,7 +210,9 @@ export default function DashboardSales() {
             <div className="flex justify-between items-start">
               <div className="flex flex-col">
                 <p className="text-xs font-semibold text-[#64748B] mb-2">Terealisasi</p>
-                <h3 className="text-[22px] font-bold text-[#1E293B] leading-none">Rp 38.400.000</h3>
+                <h3 className="text-[22px] font-bold text-[#1E293B] leading-none">
+                  {isLoading ? "Memuat..." : targetData ? `Rp ${Number(targetData.achievedRevenue || 0).toLocaleString('id-ID')}` : "Rp 0"}
+                </h3>
               </div>
               <div className={`w-[42px] h-[42px] rounded-lg flex items-center justify-center shrink-0 bg-[#22C55E] text-white`}>
                 <TrendingUp className="w-5 h-5" />
@@ -52,9 +220,9 @@ export default function DashboardSales() {
             </div>
             <div className="mt-auto">
               <div className="w-full bg-[#E2E8F0] rounded-full h-1.5 mb-1.5">
-                <div className="bg-[#22C55E] h-1.5 rounded-full" style={{ width: '76.8%' }}></div>
+                <div className="bg-[#22C55E] h-1.5 rounded-full" style={{ width: `${pct}%` }}></div>
               </div>
-              <span className="text-[11px] font-semibold text-[#64748B]">76.8% tercapai</span>
+              <span className="text-[11px] font-semibold text-[#64748B]">{pct}% tercapai</span>
             </div>
           </div>
           <StatCard 
@@ -75,17 +243,17 @@ export default function DashboardSales() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
           <Link to="/input-pesanan" className="bg-[#22C55E] text-white p-6 rounded-xl shadow-sm hover:bg-[#16A34A] transition-colors flex flex-col justify-center">
              <ShoppingCart className="w-6 h-6 mb-3 opacity-90" />
-             <h3 className="font-bold text-lg mb-1">Quick Order</h3>
+             <h3 className="font-bold text-lg mb-1">Pesanan Cepat</h3>
              <p className="text-sm opacity-90">Input pesanan cepat</p>
           </Link>
           <Link to="/laporan-kunjungan" className="bg-[#F97316] text-white p-6 rounded-xl shadow-sm hover:bg-[#EA580C] transition-colors flex flex-col justify-center">
              <MapPin className="w-6 h-6 mb-3 opacity-90" />
-             <h3 className="font-bold text-lg mb-1">Visit Log</h3>
+             <h3 className="font-bold text-lg mb-1">Catatan Kunjungan</h3>
              <p className="text-sm opacity-90">Catat kunjungan + foto</p>
           </Link>
           <Link to="/target-penjualan" className="bg-[#3B82F6] text-white p-6 rounded-xl shadow-sm hover:bg-[#2563EB] transition-colors flex flex-col justify-center">
              <Target className="w-6 h-6 mb-3 opacity-90" />
-             <h3 className="font-bold text-lg mb-1">Target Tracking</h3>
+             <h3 className="font-bold text-lg mb-1">Pantau Target</h3>
              <p className="text-sm opacity-90">Pantau pencapaian</p>
           </Link>
         </div>

@@ -1,9 +1,37 @@
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
 import { Truck, CheckCircle2, Package, ClipboardList, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { getOrders } from '../utils/mockDb';
+import { orderService } from '../services/orderService';
 
 export default function DashboardStaffGudang() {
+  const [pendingOrders, setPendingOrders] = useState([]);
+  const [shippedCount, setShippedCount] = useState(0);
+
+  useEffect(() => {
+    orderService.getAll()
+      .then(res => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.orders || []);
+        const mapped = data.map(so => ({
+          id: so.id,
+          customer: so.pelanggan?.nama || so.pelanggan?.name || so.customer || '-',
+          sales: so.user?.nama || so.user?.name || so.sales || 'Sales System',
+          status: so.status || 'Draft',
+          qty: Number(so.qty) || (so.dataDetail ? so.dataDetail.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) : 0),
+        }));
+        setPendingOrders(mapped.filter(o => o.status === 'Approved'));
+        setShippedCount(mapped.filter(o => o.status === 'Shipped' || o.status === 'Delivered').length);
+      })
+      .catch(err => {
+        console.error("Gagal load orders dari API di staff gudang, load lokal:", err);
+        const orders = getOrders();
+        setPendingOrders(orders.filter(o => o.status === 'Approved'));
+        setShippedCount(orders.filter(o => o.status === 'Shipped' || o.status === 'Delivered').length);
+      });
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
@@ -18,13 +46,13 @@ export default function DashboardStaffGudang() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           <StatCard 
             title="Pending Pengiriman" 
-            value="5" 
+            value={String(pendingOrders.length)} 
             icon={<Truck className="w-5 h-5" />} 
             bgClass="bg-[#F97316]"
           />
           <StatCard 
             title="Dikirim Hari Ini" 
-            value="12" 
+            value={String(shippedCount)} 
             icon={<CheckCircle2 className="w-5 h-5" />} 
             bgClass="bg-[#22C55E]"
           />
@@ -59,7 +87,7 @@ export default function DashboardStaffGudang() {
         {/* Pending Deliveries Table */}
         <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden mt-2">
           <div className="p-5 border-b border-[#E2E8F0]">
-            <h3 className="font-bold text-[#1E293B]">Order Fulfillment - Pending Deliveries</h3>
+            <h3 className="font-bold text-[#1E293B]">Pemenuhan Pesanan - Pengiriman Tertunda</h3>
             <p className="text-xs text-[#64748B] mt-1">Daftar pesanan yang menunggu untuk dikirim</p>
           </div>
           <div className="overflow-x-auto">
@@ -75,46 +103,35 @@ export default function DashboardStaffGudang() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">INV-2026-018</td>
-                  <td className="py-4 px-6 text-[#475569]">Berkah Sekawan Motor</td>
-                  <td className="py-4 px-6 text-[#1E293B]">8 item</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Belum</span></td>
-                  <td className="py-4 px-6 text-[#64748B]">28 Apr 2026</td>
-                  <td className="py-4 px-6"><button className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors">Input SJ</button></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">INV-2026-019</td>
-                  <td className="py-4 px-6 text-[#475569]">Jaya Motor</td>
-                  <td className="py-4 px-6 text-[#1E293B]">5 item</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Belum</span></td>
-                  <td className="py-4 px-6 text-[#64748B]">28 Apr 2026</td>
-                  <td className="py-4 px-6"><button className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors">Input SJ</button></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">INV-2026-020</td>
-                  <td className="py-4 px-6 text-[#475569]">Mandiri Service</td>
-                  <td className="py-4 px-6 text-[#1E293B]">12 item</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Belum</span></td>
-                  <td className="py-4 px-6 text-[#64748B]">27 Apr 2026</td>
-                  <td className="py-4 px-6"><button className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors">Input SJ</button></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">INV-2026-021</td>
-                  <td className="py-4 px-6 text-[#475569]">Abadi Motor</td>
-                  <td className="py-4 px-6 text-[#1E293B]">6 item</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Belum</span></td>
-                  <td className="py-4 px-6 text-[#64748B]">27 Apr 2026</td>
-                  <td className="py-4 px-6"><button className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors">Input SJ</button></td>
-                </tr>
-                <tr className="hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">INV-2026-022</td>
-                  <td className="py-4 px-6 text-[#475569]">Mitra Jaya</td>
-                  <td className="py-4 px-6 text-[#1E293B]">9 item</td>
-                  <td className="py-4 px-6"><span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">Belum</span></td>
-                  <td className="py-4 px-6 text-[#64748B]">26 Apr 2026</td>
-                  <td className="py-4 px-6"><button className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors">Input SJ</button></td>
-                </tr>
+                {pendingOrders.length === 0 ? (
+                  <tr>
+                    <td colSpan="6" className="py-8 px-6 text-center text-xs text-[#94A3B8]">
+                      Tidak ada pesanan pending pengiriman.
+                    </td>
+                  </tr>
+                ) : (
+                  pendingOrders.map(o => (
+                    <tr key={o.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
+                      <td className="py-4 px-6 font-bold text-[#1E293B]">{o.id}</td>
+                      <td className="py-4 px-6 text-[#475569]">{o.customer}</td>
+                      <td className="py-4 px-6 text-[#1E293B]">{o.qty} Dus</td>
+                      <td className="py-4 px-6">
+                        <span className="px-3 py-1 rounded-full text-xs font-semibold bg-[#FEF3C7] text-[#D97706]">
+                          Belum
+                        </span>
+                      </td>
+                      <td className="py-4 px-6 text-[#64748B]">{o.date}</td>
+                      <td className="py-4 px-6">
+                        <Link 
+                          to={`/pengiriman-barang?openModal=${o.id}`} 
+                          className="bg-[#4F46E5] text-white text-xs font-semibold py-1.5 px-3 rounded-lg hover:bg-[#4338CA] transition-colors inline-block text-center"
+                        >
+                          Input SJ
+                        </Link>
+                      </td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
           </div>

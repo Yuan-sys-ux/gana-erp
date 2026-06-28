@@ -1,21 +1,127 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, AlertTriangle, CheckCircle2, Clock, Mail, Phone, DollarSign } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, Clock, Mail, Phone, DollarSign, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import api from '../utils/api';
+import { getOrders, confirmOrderPaymentLocal, getCustomers, saveCustomers, saveOrders } from '../utils/mockDb';
 
 export default function MonitoringPiutang() {
-  const piutangList = [
-    { id: 'INV-2605-01', customer: 'Berkah Sekawan Motor', city: 'Banjarmasin', amount: 15400000, dueDate: '15 Mei 2026', status: 'overdue', days: 5 },
-    { id: 'INV-2605-04', customer: 'Jaya Motor Banjarmasin', city: 'Banjarmasin', amount: 12800000, dueDate: '22 Mei 2026', status: 'warning', days: 2 },
-    { id: 'INV-2605-08', customer: 'Mandiri Service', city: 'Banjarbaru', amount: 8600000, dueDate: '28 Mei 2026', status: 'safe', days: 8 },
-    { id: 'INV-2605-12', customer: 'Abadi Motor', city: 'Banjarmasin', amount: 5200000, dueDate: '01 Jun 2026', status: 'safe', days: 12 },
-    { id: 'INV-2604-99', customer: 'Sejahtera Service', city: 'Banjarmasin', amount: 2100000, dueDate: '05 Mei 2026', status: 'overdue', days: 15 },
-  ];
-
+  const [role, setRole] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Semua Status');
+  const [confirmingItem, setConfirmingItem] = useState(null);
+  const [alertModal, setAlertModal] = useState({
+    isOpen: false,
+    type: 'success',
+    title: '',
+    message: ''
+  });
+
+  const showAlert = (type, title, message) => {
+    setAlertModal({ isOpen: true, type, title, message });
+  };
+
+  const closeAlert = () => {
+    setAlertModal({ isOpen: false, type: 'success', title: '', message: '' });
+  };
+
+  const [piutangData, setPiutangData] = useState({
+    stats: {
+      totalPiutang: 0,
+      overduePiutang: 0,
+      countOverdue: 0,
+      warningPiutang: 0
+    },
+    list: []
+  });
+  
+  const loadLocalPiutang = () => {
+    const orders = getOrders();
+    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    const parseDueDate = (dateStr) => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split(' ');
+      if (parts.length < 3) return new Date();
+      const day = parseInt(parts[0]);
+      const monthName = parts[1];
+      const year = parseInt(parts[2]);
+      const monthIdx = monthsId.indexOf(monthName);
+      return new Date(year, monthIdx, day);
+    };
+
+    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
+    const now = new Date(2026, 5, 12); // 12 June 2026
+
+    const list = unpaidOrders.map(o => {
+      const dueDateObj = parseDueDate(o.dueDate);
+      const diffTime = dueDateObj.getTime() - now.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let status = 'safe';
+      let days = diffDays;
+
+      if (diffDays < 0) {
+        status = 'overdue';
+        days = Math.abs(diffDays);
+      } else if (diffDays <= 7) {
+        status = 'warning';
+        days = diffDays;
+      } else {
+        status = 'safe';
+        days = diffDays;
+      }
+
+      return {
+        id: o.id_transaksi || o.invoiceId || `INV-${o.id}`,
+        dbId: o.id,
+        customer: o.customer,
+        city: o.address ? o.address.split(',').pop().trim() : 'Banjarmasin',
+        amount: Number(o.total || 0),
+        dueDate: o.dueDate,
+        status,
+        days
+      };
+    });
+
+    const totalPiutang = list.reduce((sum, item) => sum + item.amount, 0);
+    const overduePiutang = list.filter(item => item.status === 'overdue').reduce((sum, item) => sum + item.amount, 0);
+    const countOverdue = list.filter(item => item.status === 'overdue').length;
+    const warningPiutang = list.filter(item => item.status === 'warning').reduce((sum, item) => sum + item.amount, 0);
+
+    return {
+      stats: { totalPiutang, overduePiutang, countOverdue, warningPiutang },
+      list
+    };
+  };
+
+  const fetchPiutang = () => {
+    setIsLoading(true);
+    api.get('/api/owner/monitoring-piutang')
+      .then(res => {
+        if (res.data && res.data.success) {
+          setPiutangData({
+            stats: res.data.stats,
+            list: res.data.list
+          });
+        }
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error("Gagal memuat monitoring piutang dari API, gunakan fallback lokal:", err);
+        const localData = loadLocalPiutang();
+        setPiutangData(localData);
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    setRole(localStorage.getItem('userRole') || 'admin');
+    fetchPiutang();
+  }, []);
 
   const filteredPiutang = useMemo(() => {
-    return piutangList.filter(item => {
+    return piutangData.list.filter(item => {
       const matchSearch = item.customer.toLowerCase().includes(searchTerm.toLowerCase()) || 
                           item.id.toLowerCase().includes(searchTerm.toLowerCase());
       
@@ -26,7 +132,33 @@ export default function MonitoringPiutang() {
 
       return matchSearch && matchStatus;
     });
-  }, [searchTerm, filterStatus]);
+  }, [piutangData.list, searchTerm, filterStatus]);
+
+  const downloadExcel = () => {
+    let csvContent = "\uFEFF"; // BOM for Excel on Windows to read UTF-8 properly
+    csvContent += "Bengkel / Pelanggan;No Invoice;Nominal;Jatuh Tempo;Status\r\n";
+    filteredPiutang.forEach(item => {
+      let statusText = '';
+      if (item.status === 'overdue') {
+        statusText = `Telat ${item.days} Hari`;
+      } else if (item.status === 'warning') {
+        statusText = `Sisa ${item.days} Hari (Peringatan)`;
+      } else {
+        statusText = `Sisa ${item.days} Hari`;
+      }
+      const cleanCustomer = item.customer.replace(/;/g, ',');
+      csvContent += `${cleanCustomer};${item.id};${item.amount};${item.dueDate};${statusText}\r\n`;
+    });
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Rekap_Piutang_${new Date().toISOString().slice(0, 10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   const handleReminder = (type, customer) => {
     if (type === 'phone') {
@@ -34,6 +166,56 @@ export default function MonitoringPiutang() {
     } else {
       alert(`Mengirim Email Reminder tagihan ke ${customer}...`);
     }
+  };
+
+  const handleConfirmPayment = (item) => {
+    setConfirmingItem(item);
+  };
+
+  const handleConfirmPaymentSubmit = () => {
+    if (!confirmingItem) return;
+    
+    const id = confirmingItem.dbId;
+    
+    // First try database API
+    api.put(`/api/penjualan/${id}`, { statusBayar: 'Lunas' })
+      .then(res => {
+        showAlert('success', 'Pembayaran Lunas!', `Pembayaran invoice ${confirmingItem.id} berhasil dikonfirmasi lunas.`);
+        fetchPiutang();
+        setConfirmingItem(null);
+      })
+      .catch(err => {
+        console.error("Gagal update status bayar di API, update lokal:", err);
+        // Fallback to local mockDb
+        try {
+          confirmOrderPaymentLocal(id);
+          showAlert('success', 'Pembayaran Lunas (Lokal)!', `Gagal terhubung ke server, namun status bayar invoice ${confirmingItem.id} berhasil dikonfirmasi lunas secara lokal.`);
+        } catch (localErr) {
+          console.error("Gagal update status bayar lokal:", localErr);
+          // Manually do it if function fails
+          const orders = getOrders();
+          const updatedOrders = orders.map(o => {
+            if (o.id === id || o.invoiceId === id || o.id_transaksi === id) {
+              return { ...o, statusBayar: 'Lunas' };
+            }
+            return o;
+          });
+          saveOrders(updatedOrders);
+
+          const order = orders.find(o => o.id === id || o.invoiceId === id || o.id_transaksi === id);
+          if (order) {
+            const customers = getCustomers();
+            const customerIndex = customers.findIndex(c => c.name === order.customer);
+            if (customerIndex !== -1) {
+              customers[customerIndex].outstanding = Math.max(0, customers[customerIndex].outstanding - order.total);
+              saveCustomers(customers);
+            }
+          }
+          showAlert('success', 'Pembayaran Lunas (Lokal)!', `Gagal terhubung ke server, namun status bayar invoice ${confirmingItem.id} berhasil dikonfirmasi lunas secara lokal (manual).`);
+        }
+        fetchPiutang();
+        setConfirmingItem(null);
+      });
   };
 
   return (
@@ -46,151 +228,218 @@ export default function MonitoringPiutang() {
             <h2 className="text-2xl font-bold text-[#1E293B]">Monitoring Piutang</h2>
             <p className="text-sm text-[#64748B] mt-1">Pantau status pembayaran dan tagihan jatuh tempo</p>
           </div>
-          <button className="bg-white border border-[#E2E8F0] text-[#475569] hover:bg-gray-50 px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2">
-            Download Rekap (PDF)
+          <button 
+            onClick={downloadExcel}
+            className="bg-[#10B981] hover:bg-[#059669] text-white px-4 py-2 rounded-lg text-sm font-semibold shadow-sm transition-colors flex items-center gap-2"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            Download Rekap (Excel)
           </button>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0]">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-[#2563EB]" />
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 text-[#4F46E5] animate-spin" />
+            <p className="text-xs font-bold text-[#64748B]">Memuat data piutang...</p>
+          </div>
+        ) : (
+          <>
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-white rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0]">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-[#EFF6FF] rounded-xl flex items-center justify-center">
+                    <DollarSign className="w-6 h-6 text-[#2563EB]" />
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-[#64748B] mb-1">Total Piutang Berjalan</p>
+                <h3 className="text-3xl font-black text-[#1E293B]">
+                  Rp {piutangData.stats.totalPiutang.toLocaleString('id-ID')}
+                </h3>
+              </div>
+              
+              <div className="bg-[#FEF2F2] rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#FECACA]">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-[#DC2626] rounded-xl flex items-center justify-center shadow-inner">
+                    <AlertTriangle className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-[#991B1B] mb-1">Jatuh Tempo (Overdue)</p>
+                <h3 className="text-3xl font-black text-[#7F1D1D]">
+                  Rp {piutangData.stats.overduePiutang.toLocaleString('id-ID')}
+                </h3>
+                <p className="text-xs font-semibold text-[#DC2626] mt-2">
+                  Terdapat {piutangData.stats.countOverdue} tagihan menunggak
+                </p>
+              </div>
+
+              <div className="bg-[#FFFBEB] rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#FDE68A]">
+                <div className="flex justify-between items-start mb-4">
+                  <div className="w-12 h-12 bg-[#F59E0B] rounded-xl flex items-center justify-center shadow-inner">
+                    <Clock className="w-6 h-6 text-white" />
+                  </div>
+                </div>
+                <p className="text-sm font-bold text-[#92400E] mb-1">Peringatan (&lt; 7 Hari)</p>
+                <h3 className="text-3xl font-black text-[#78350F]">
+                  Rp {piutangData.stats.warningPiutang.toLocaleString('id-ID')}
+                </h3>
+                <p className="text-xs font-semibold text-[#D97706] mt-2">Segera ingatkan pelanggan</p>
               </div>
             </div>
-            <p className="text-sm font-bold text-[#64748B] mb-1">Total Piutang Berjalan</p>
-            <h3 className="text-3xl font-black text-[#1E293B]">Rp 44.1 JT</h3>
-          </div>
-          
-          <div className="bg-[#FEF2F2] rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#FECACA]">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-[#DC2626] rounded-xl flex items-center justify-center shadow-inner">
-                <AlertTriangle className="w-6 h-6 text-white" />
+
+            {/* Action Bar */}
+            <div className="flex items-center gap-4 bg-white p-2 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0]">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="w-4 h-4 text-[#94A3B8]" />
+                </div>
+                <input 
+                  type="text" 
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  placeholder="Cari nama bengkel atau no invoice..." 
+                  className="w-full pl-10 pr-4 py-2.5 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
+                />
+              </div>
+              <div className="w-px h-8 bg-[#E2E8F0] mx-2"></div>
+              <select 
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white min-w-[150px] mr-2"
+              >
+                <option value="Semua Status">Semua Status</option>
+                <option value="Overdue">Jatuh Tempo</option>
+                <option value="Warning">Peringatan</option>
+                <option value="Aman">Aman</option>
+              </select>
+            </div>
+
+            {/* Data Table */}
+            <div className="bg-white rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] uppercase tracking-wider border-b border-[#E2E8F0]">
+                      <th className="py-4 px-6">BENGKEL / PELANGGAN</th>
+                      <th className="py-4 px-6">NO INVOICE</th>
+                      <th className="py-4 px-6">NOMINAL</th>
+                      <th className="py-4 px-6">JATUH TEMPO</th>
+                      <th className="py-4 px-6">STATUS</th>
+                      <th className="py-4 px-6 text-center">AKSI</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {filteredPiutang.length > 0 ? filteredPiutang.map((item, idx) => (
+                      <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
+                        <td className="py-4 px-6">
+                          <p className="font-bold text-[#1E293B]">{item.customer}</p>
+                          <p className="text-xs text-[#64748B]">{item.city}</p>
+                        </td>
+                        <td className="py-4 px-6 text-[#4F46E5] font-semibold text-xs">
+                          {item.id}
+                        </td>
+                        <td className="py-4 px-6 font-bold text-[#1E293B]">
+                          Rp {item.amount.toLocaleString('id-ID')}
+                        </td>
+                        <td className="py-4 px-6">
+                          <p className="font-semibold text-[#334155]">{item.dueDate}</p>
+                        </td>
+                        <td className="py-4 px-6">
+                          {item.status === 'overdue' && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEE2E2] border border-[#FECACA] text-[#DC2626]">
+                              <AlertTriangle className="w-3 h-3" />
+                              <span className="text-[10px] font-bold">Telat {item.days} Hari</span>
+                            </div>
+                          )}
+                          {item.status === 'warning' && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706]">
+                              <Clock className="w-3 h-3" />
+                              <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
+                            </div>
+                          )}
+                          {item.status === 'safe' && (
+                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DCFCE7] border border-[#BBF7D0] text-[#16A34A]">
+                              <CheckCircle2 className="w-3 h-3" />
+                              <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
+                            </div>
+                          )}
+                        </td>
+                        <td className="py-4 px-6 text-center">
+                          <button
+                            onClick={() => handleConfirmPayment(item)}
+                            className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 mx-auto"
+                            title="Konfirmasi Lunas"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            <span>Konfirmasi Lunas</span>
+                          </button>
+                        </td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td colSpan="6" className="py-8 text-center text-[#64748B]">Tidak ada data piutang yang sesuai.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             </div>
-            <p className="text-sm font-bold text-[#991B1B] mb-1">Overdue (Jatuh Tempo)</p>
-            <h3 className="text-3xl font-black text-[#7F1D1D]">Rp 17.5 JT</h3>
-            <p className="text-xs font-semibold text-[#DC2626] mt-2">Terdapat 2 tagihan menunggak</p>
-          </div>
-
-          <div className="bg-[#FFFBEB] rounded-2xl p-6 shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#FDE68A]">
-            <div className="flex justify-between items-start mb-4">
-              <div className="w-12 h-12 bg-[#F59E0B] rounded-xl flex items-center justify-center shadow-inner">
-                <Clock className="w-6 h-6 text-white" />
-              </div>
-            </div>
-            <p className="text-sm font-bold text-[#92400E] mb-1">Warning (&lt; 7 Hari)</p>
-            <h3 className="text-3xl font-black text-[#78350F]">Rp 12.8 JT</h3>
-            <p className="text-xs font-semibold text-[#D97706] mt-2">Segera lakukan reminder</p>
-          </div>
-        </div>
-
-        {/* Action Bar */}
-        <div className="flex items-center gap-4 bg-white p-2 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0]">
-          <div className="relative flex-1">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-              <Search className="w-4 h-4 text-[#94A3B8]" />
-            </div>
-            <input 
-              type="text" 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Cari nama bengkel atau no invoice..." 
-              className="w-full pl-10 pr-4 py-2.5 border-none rounded-lg text-sm focus:outline-none focus:ring-0 text-[#334155] placeholder:text-[#94A3B8] bg-transparent"
-            />
-          </div>
-          <div className="w-px h-8 bg-[#E2E8F0] mx-2"></div>
-          <select 
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-            className="border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm text-[#334155] focus:outline-none focus:ring-1 focus:ring-[#4F46E5] bg-white min-w-[150px] mr-2"
-          >
-            <option value="Semua Status">Semua Status</option>
-            <option value="Overdue">Overdue</option>
-            <option value="Warning">Warning</option>
-            <option value="Aman">Aman</option>
-          </select>
-        </div>
-
-        {/* Data Table */}
-        <div className="bg-white rounded-2xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
-              <thead>
-                <tr className="bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] uppercase tracking-wider border-b border-[#E2E8F0]">
-                  <th className="py-4 px-6">BENGKEL / PELANGGAN</th>
-                  <th className="py-4 px-6">NO INVOICE</th>
-                  <th className="py-4 px-6">NOMINAL</th>
-                  <th className="py-4 px-6">JATUH TEMPO</th>
-                  <th className="py-4 px-6">STATUS</th>
-                  <th className="py-4 px-6 text-center">TINDAKAN</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                {filteredPiutang.length > 0 ? filteredPiutang.map((item, idx) => (
-                  <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
-                    <td className="py-4 px-6">
-                      <p className="font-bold text-[#1E293B]">{item.customer}</p>
-                      <p className="text-xs text-[#64748B]">{item.city}</p>
-                    </td>
-                    <td className="py-4 px-6 text-[#4F46E5] font-semibold text-xs">
-                      {item.id}
-                    </td>
-                    <td className="py-4 px-6 font-bold text-[#1E293B]">
-                      Rp {item.amount.toLocaleString('id-ID')}
-                    </td>
-                    <td className="py-4 px-6">
-                      <p className="font-semibold text-[#334155]">{item.dueDate}</p>
-                    </td>
-                    <td className="py-4 px-6">
-                      {item.status === 'overdue' && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEE2E2] border border-[#FECACA] text-[#DC2626]">
-                          <AlertTriangle className="w-3 h-3" />
-                          <span className="text-[10px] font-bold">Telat {item.days} Hari</span>
-                        </div>
-                      )}
-                      {item.status === 'warning' && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706]">
-                          <Clock className="w-3 h-3" />
-                          <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
-                        </div>
-                      )}
-                      {item.status === 'safe' && (
-                        <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DCFCE7] border border-[#BBF7D0] text-[#16A34A]">
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
-                        </div>
-                      )}
-                    </td>
-                    <td className="py-4 px-6">
-                      <div className="flex items-center justify-center gap-2">
-                        <button 
-                          onClick={() => handleReminder('phone', item.customer)}
-                          className="p-2 rounded-lg bg-[#EFF6FF] text-[#2563EB] hover:bg-[#DBEAFE] transition-colors" title="Hubungi via Telepon"
-                        >
-                          <Phone className="w-4 h-4" />
-                        </button>
-                        <button 
-                          onClick={() => handleReminder('email', item.customer)}
-                          className="p-2 rounded-lg bg-[#F0FDF4] text-[#16A34A] hover:bg-[#DCFCE7] transition-colors" title="Kirim Email Reminder"
-                        >
-                          <Mail className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="6" className="py-8 text-center text-[#64748B]">Tidak ada data piutang yang sesuai.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
+          </>
+        )}
 
       </div>
+
+      {/* Modal Konfirmasi Pembayaran Lunas */}
+      {confirmingItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-6 text-center animate-in zoom-in-95 duration-200">
+            <div className="w-16 h-16 bg-[#D1FAE5] rounded-full flex items-center justify-center mx-auto mb-4">
+              <DollarSign className="w-8 h-8 text-[#10B981]" />
+            </div>
+            <h3 className="text-lg font-bold text-[#1E293B] mb-2">Konfirmasi Pembayaran Lunas?</h3>
+            <p className="text-sm text-[#64748B] mb-6">
+              Apakah Anda yakin ingin menandai invoice <span className="font-bold text-[#1E293B]">{confirmingItem.id}</span> untuk pelanggan <span className="font-bold text-[#1E293B]">{confirmingItem.customer}</span> sebesar <span className="font-bold text-[#10B981]">Rp {confirmingItem.amount.toLocaleString('id-ID')}</span> sebagai <span className="font-bold text-[#10B981]">Lunas</span>?
+            </p>
+            <div className="flex gap-3">
+              <button 
+                onClick={() => setConfirmingItem(null)} 
+                className="flex-1 py-2.5 bg-[#F1F5F9] text-[#475569] hover:bg-[#E2E8F0] font-semibold rounded-xl transition-colors"
+              >
+                Batal
+              </button>
+              <button 
+                onClick={handleConfirmPaymentSubmit} 
+                className="flex-1 py-2.5 bg-[#10B981] text-white hover:bg-[#059669] font-semibold rounded-xl transition-colors shadow-sm"
+              >
+                Ya, Konfirmasi Lunas
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Alert Modal */}
+      {alertModal.isOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/55 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className={`p-6 text-center ${alertModal.type === 'success' ? 'bg-[#F0FDF4]' : 'bg-[#FEE2E2]'}`}>
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4 ${alertModal.type === 'success' ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FECACA] text-[#DC2626]'}`}>
+                {alertModal.type === 'success' ? <CheckCircle2 className="w-8 h-8" /> : <AlertCircle className="w-8 h-8" />}
+              </div>
+              <h3 className="text-xl font-bold text-[#1E293B] mb-2">{alertModal.title}</h3>
+              <p className="text-sm text-[#475569]">{alertModal.message}</p>
+            </div>
+            <div className="p-4 bg-white border-t border-[#E2E8F0]">
+              <button 
+                onClick={closeAlert}
+                className={`w-full py-2.5 rounded-xl font-bold text-white transition-colors shadow-sm ${alertModal.type === 'success' ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#DC2626] hover:bg-[#B91C1C]'}`}
+              >
+                OK, Mengerti
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </DashboardLayout>
   );
 }

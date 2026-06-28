@@ -2,19 +2,61 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import { ShieldCheck, XCircle, CheckCircle2, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import { getIncomingStock, updateIncomingStockStatus } from '../utils/mockDb';
+import { purchaseService } from '../services/purchaseService';
 
 export default function ApprovalStokMasuk() {
   const [approvals, setApprovals] = useState([]);
   const [expandedCardId, setExpandedCardId] = useState(null);
 
+  const loadApprovals = () => {
+    purchaseService.getAll()
+      .then(res => {
+        setApprovals(res);
+      })
+      .catch(err => {
+        console.error("Gagal load approvals dari API, fallback lokal:", err);
+        setApprovals(getIncomingStock());
+      });
+  };
+
   useEffect(() => {
-    setApprovals(getIncomingStock());
+    loadApprovals();
   }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('semua');
 
+  const isWithin24Hours = (item) => {
+    const timeLimit = 24 * 60 * 60 * 1000; // 24 hours in ms
+    let baseTime = null;
+    if (item.updatedAt) {
+      baseTime = new Date(item.updatedAt).getTime();
+    } else if (item.createdAt) {
+      baseTime = new Date(item.createdAt).getTime();
+    } else if (item.date) {
+      try {
+        const monthsId = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Ags", "Sep", "Okt", "Nov", "Des"];
+        const monthsEn = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+        let normalized = item.date.replace("WITA", "").trim();
+        monthsId.forEach((m, idx) => {
+          normalized = normalized.replace(m, monthsEn[idx]);
+        });
+        baseTime = Date.parse(normalized);
+      } catch (e) {
+        baseTime = null;
+      }
+    }
+    if (baseTime && !isNaN(baseTime)) {
+      const diff = Date.now() - baseTime;
+      return diff <= timeLimit && diff >= 0;
+    }
+    return false;
+  };
+
   const filteredApprovals = approvals.filter(item => {
+    if (item.status === 'approved' || item.status === 'rejected') {
+      if (!isWithin24Hours(item)) return false;
+    }
     const matchSearch = item.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
                         item.supplier.toLowerCase().includes(searchTerm.toLowerCase());
     const matchStatus = filterStatus === 'semua' || item.status === filterStatus;
@@ -22,13 +64,37 @@ export default function ApprovalStokMasuk() {
   });
 
   const handleApprove = (id) => {
-    updateIncomingStockStatus(id, 'approved');
-    setApprovals(getIncomingStock());
+    const dbId = id.replace('RCV-', '');
+    const isMock = isNaN(Number(dbId));
+    if (isMock) {
+      updateIncomingStockStatus(id, 'approved');
+      setApprovals(getIncomingStock());
+    } else {
+      purchaseService.update(id, { status: 'approved' })
+        .then(() => loadApprovals())
+        .catch(err => {
+          console.error("Gagal approve:", err);
+          updateIncomingStockStatus(id, 'approved');
+          loadApprovals();
+        });
+    }
   };
 
   const handleReject = (id) => {
-    updateIncomingStockStatus(id, 'rejected');
-    setApprovals(getIncomingStock());
+    const dbId = id.replace('RCV-', '');
+    const isMock = isNaN(Number(dbId));
+    if (isMock) {
+      updateIncomingStockStatus(id, 'rejected');
+      setApprovals(getIncomingStock());
+    } else {
+      purchaseService.update(id, { status: 'rejected' })
+        .then(() => loadApprovals())
+        .catch(err => {
+          console.error("Gagal reject:", err);
+          updateIncomingStockStatus(id, 'rejected');
+          loadApprovals();
+        });
+    }
   };
 
   const toggleExpand = (id) => {
@@ -52,7 +118,7 @@ export default function ApprovalStokMasuk() {
             </div>
             <div className="text-center px-4">
               <p className="text-[10px] font-bold text-[#64748B] uppercase">Disetujui Hari Ini</p>
-              <p className="text-lg font-black text-[#16A34A]">{approvals.filter(a => a.status === 'approved').length}</p>
+              <p className="text-lg font-black text-[#16A34A]">{approvals.filter(a => a.status === 'approved' && isWithin24Hours(a)).length}</p>
             </div>
           </div>
         </div>
@@ -153,7 +219,7 @@ export default function ApprovalStokMasuk() {
                         onClick={() => handleApprove(item.id)}
                         className="px-6 py-2 bg-[#16A34A] hover:bg-[#15803D] text-white font-semibold text-sm rounded-xl shadow-sm transition-colors flex items-center gap-2"
                       >
-                        <ShieldCheck className="w-4 h-4" /> Approve
+                        <ShieldCheck className="w-4 h-4" /> Setujui
                       </button>
                     </>
                   ) : item.status === 'approved' ? (

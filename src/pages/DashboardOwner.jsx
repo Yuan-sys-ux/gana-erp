@@ -1,191 +1,385 @@
+import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
-import { DollarSign, AlertTriangle, TrendingUp, Calendar, ArrowUpRight } from 'lucide-react';
+import { DollarSign, AlertTriangle, TrendingUp, Calendar, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import api from '../utils/api';
+import { getOrders, getProducts } from '../utils/mockDb';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardOwner() {
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedMonth, setSelectedMonth] = useState('06');
+  const [selectedYear, setSelectedYear] = useState('2026');
+
+  const [dashboardData, setDashboardData] = useState({
+    stats: {
+      totalPiutang: 0,
+      piutangJatuhTempo: 0,
+      countBengkelJatuhTempo: 0,
+      salesMTD: 0,
+      purchaseMTD: 0
+    },
+    chartData: [],
+    topReceivables: []
+  });
+
+  const months = [
+    { value: '01', label: 'Januari' },
+    { value: '02', label: 'Februari' },
+    { value: '03', label: 'Maret' },
+    { value: '04', label: 'April' },
+    { value: '05', label: 'Mei' },
+    { value: '06', label: 'Juni' },
+    { value: '07', label: 'Juli' },
+    { value: '08', label: 'Agustus' },
+    { value: '09', label: 'September' },
+    { value: '10', label: 'Oktober' },
+    { value: '11', label: 'November' },
+    { value: '12', label: 'Desember' }
+  ];
+
+  const years = ['2024', '2025', '2026', '2027'];
+
+  const loadLocalDashboard = (targetMonth) => {
+    const orders = getOrders();
+    const products = getProducts();
+    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
+
+    const parseToMonthKey = (dateStr) => {
+      if (!dateStr) return '';
+      const parts = dateStr.split(' ');
+      if (parts.length < 3) return '';
+      const monthName = parts[1];
+      const year = parts[2];
+      const monthIdx = monthsId.indexOf(monthName);
+      if (monthIdx === -1) return '';
+      const monthStr = String(monthIdx + 1).padStart(2, '0');
+      return `${year}-${monthStr}`;
+    };
+
+    if (targetMonth > '2026-06') {
+      return {
+        stats: { totalPiutang: 0, piutangJatuhTempo: 0, countBengkelJatuhTempo: 0, salesMTD: 0, purchaseMTD: 0 },
+        chartData: [],
+        topReceivables: []
+      };
+    }
+
+    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
+    const totalPiutang = unpaidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+
+    const parseDueDate = (dateStr) => {
+      if (!dateStr) return new Date();
+      const parts = dateStr.split(' ');
+      if (parts.length < 3) return new Date();
+      const day = parseInt(parts[0]);
+      const monthName = parts[1];
+      const year = parseInt(parts[2]);
+      const monthIdx = monthsId.indexOf(monthName);
+      return new Date(year, monthIdx, day);
+    };
+
+    const mockCurrentDate = new Date(2026, 5, 12);
+    const overdueOrders = unpaidOrders.filter(o => {
+      const d = parseDueDate(o.dueDate);
+      return d < mockCurrentDate;
+    });
+
+    const piutangJatuhTempo = overdueOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const countBengkelJatuhTempo = new Set(overdueOrders.map(o => o.customer)).size;
+
+    const monthlyOrders = orders.filter(o => parseToMonthKey(o.date) === targetMonth);
+    const salesMTD = monthlyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+    const purchaseMTD = salesMTD * 0.7;
+
+    const chartData = [];
+    const [year, month] = targetMonth.split('-').map(Number);
+    for (let i = 3; i >= 0; i--) {
+      const d = new Date(year, month - 1 - i, 1);
+      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const label = `${monthsId[d.getMonth()]} ${d.getFullYear()}`;
+      
+      const mOrders = orders.filter(o => parseToMonthKey(o.date) === mStr);
+      const sVal = mOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
+      const pVal = sVal * 0.7;
+
+      chartData.push({
+        month: mStr,
+        label,
+        sales: sVal,
+        purchase: pVal
+      });
+    }
+
+    const customerMap = {};
+    unpaidOrders.forEach(o => {
+      customerMap[o.customer] = (customerMap[o.customer] || 0) + Number(o.total || 0);
+    });
+
+    const topReceivables = Object.keys(customerMap).map(name => {
+      const custOrders = overdueOrders.filter(o => o.customer === name);
+      let maxDays = 0;
+      if (custOrders.length > 0) {
+        const diffs = custOrders.map(o => {
+          const d = parseDueDate(o.dueDate);
+          return Math.ceil((mockCurrentDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
+        });
+        maxDays = Math.max(...diffs);
+      }
+
+      let color = 'bg-[#22C55E]';
+      if (maxDays > 30) color = 'bg-[#F59E0B]';
+      if (maxDays > 60) color = 'bg-[#EF4444]';
+
+      return {
+        customer: name,
+        outstanding: customerMap[name],
+        overdueText: maxDays > 0 ? `${maxDays} hari` : '0 hari',
+        color
+      };
+    }).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5);
+
+    return {
+      stats: { totalPiutang, piutangJatuhTempo, countBengkelJatuhTempo, salesMTD, purchaseMTD },
+      chartData,
+      topReceivables
+    };
+  };
+
+  const fetchDashboard = (monthKey) => {
+    setIsLoading(true);
+    api.get('/api/owner/dashboard', { params: { bulan: monthKey } })
+      .then(res => {
+        if (res.data && res.data.success) {
+          setDashboardData({
+            stats: res.data.stats,
+            chartData: res.data.chartData,
+            topReceivables: res.data.topReceivables
+          });
+        }
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error("Gagal memuat dashboard dari API, gunakan fallback lokal:", err);
+        const localData = loadLocalDashboard(monthKey);
+        setDashboardData(localData);
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    fetchDashboard(`${selectedYear}-${selectedMonth}`);
+  }, [selectedMonth, selectedYear]);
+
+  // Max value to scale bars in the chart
+  const maxChartVal = Math.max(
+    ...dashboardData.chartData.map(c => Math.max(c.sales, c.purchase)),
+    1000000
+  );
+
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
         
-        {/* Title Section */}
-        <div>
-          <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Owner - Pak Tigana</h2>
-          <p className="text-xs text-[#64748B] mt-1">Monitoring profitabilitas dan piutang bermasalah</p>
-        </div>
-
-        {/* Stat Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard 
-            title="Total Piutang" 
-            value="Rp 285.400.000" 
-            icon={<DollarSign className="w-5 h-5" />} 
-            bgClass="bg-[#3B82F6]"
-            trend="+8.2%"
-          />
-          <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] p-5 flex flex-col justify-between border border-[#E2E8F0] h-full gap-4">
-            <div className="flex justify-between items-start">
-              <div className="flex flex-col">
-                <p className="text-xs font-semibold text-[#64748B] mb-2">Piutang Jatuh Tempo</p>
-                <h3 className="text-[22px] font-bold text-[#1E293B] leading-none">Rp 45.200.000</h3>
-              </div>
-              <div className={`w-[42px] h-[42px] rounded-lg flex items-center justify-center shrink-0 bg-[#EF4444] text-white`}>
-                <AlertTriangle className="w-5 h-5" />
-              </div>
-            </div>
-            <div className="flex items-center gap-1.5 mt-auto">
-              <span className="text-[11px] font-semibold text-[#EF4444]">12 bengkel</span>
-            </div>
+        {/* Title & Filter Section */}
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Owner - Pak Tigana</h2>
+            <p className="text-xs text-[#64748B] mt-1">Monitoring profitabilitas dan piutang bermasalah</p>
           </div>
-          <StatCard 
-            title="Sales MTD" 
-            value="Rp 445.800.000" 
-            icon={<TrendingUp className="w-5 h-5" />} 
-            bgClass="bg-[#22C55E]"
-            trend="+15.3%"
-          />
-          <StatCard 
-            title="Purchase MTD" 
-            value="Rp 298.500.000" 
-            icon={<Calendar className="w-5 h-5" />} 
-            bgClass="bg-[#A855F7]"
-            trend="+6.7%"
-          />
-        </div>
-
-        {/* Middle Section: Chart and Actions */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
-          
-          {/* Chart Section */}
-          <div className="lg:col-span-2 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] p-5 flex flex-col">
-            <h3 className="font-bold text-[#1E293B] mb-6">Sales vs Purchases MTD</h3>
-            
-            <div className="flex-1 flex flex-col justify-between gap-6">
-              {/* Jan 2026 */}
-              <div>
-                <p className="text-xs font-semibold text-[#64748B] mb-2">Jan 2026</p>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="bg-[#22C55E] h-5 rounded-r w-[85%]"></div>
-                  <span className="text-[10px] font-bold text-[#22C55E]">Sales: Rp 380jt</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="bg-[#3B82F6] h-5 rounded-r w-[55%]"></div>
-                  <span className="text-[10px] font-bold text-[#3B82F6]">Purchase: Rp 245jt</span>
-                </div>
-              </div>
-
-              {/* Feb 2026 */}
-              <div>
-                <p className="text-xs font-semibold text-[#64748B] mb-2">Feb 2026</p>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="bg-[#22C55E] h-5 rounded-r w-[95%]"></div>
-                  <span className="text-[10px] font-bold text-[#22C55E]">Sales: Rp 420jt</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="bg-[#3B82F6] h-5 rounded-r w-[62%]"></div>
-                  <span className="text-[10px] font-bold text-[#3B82F6]">Purchase: Rp 280jt</span>
-                </div>
-              </div>
-
-              {/* Mar 2026 */}
-              <div>
-                <p className="text-xs font-semibold text-[#64748B] mb-2">Mar 2026</p>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="bg-[#22C55E] h-5 rounded-r w-[88%]"></div>
-                  <span className="text-[10px] font-bold text-[#22C55E]">Sales: Rp 390jt</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="bg-[#3B82F6] h-5 rounded-r w-[60%]"></div>
-                  <span className="text-[10px] font-bold text-[#3B82F6]">Purchase: Rp 265jt</span>
-                </div>
-              </div>
-
-              {/* Apr 2026 */}
-              <div>
-                <p className="text-xs font-semibold text-[#64748B] mb-2">Apr 2026</p>
-                <div className="flex items-center gap-2 mb-1">
-                  <div className="bg-[#22C55E] h-5 rounded-r w-[100%]"></div>
-                  <span className="text-[10px] font-bold text-[#22C55E]">Sales: Rp 446jt</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="bg-[#3B82F6] h-5 rounded-r w-[66%]"></div>
-                  <span className="text-[10px] font-bold text-[#3B82F6]">Purchase: Rp 298jt</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Action Cards */}
-          <div className="flex flex-col gap-4">
-            <Link to="/aging-schedule" className="bg-[#EF4444] text-white p-6 rounded-xl shadow-sm hover:bg-[#DC2626] transition-colors flex-1 flex flex-col justify-center">
-               <AlertTriangle className="w-6 h-6 mb-3 opacity-90" />
-               <h3 className="font-bold text-lg mb-1">Aging Schedule</h3>
-               <p className="text-sm opacity-90">Piutang 30-180+ hari</p>
-            </Link>
-            <Link to="/monitoring-piutang" className="bg-[#3B82F6] text-white p-6 rounded-xl shadow-sm hover:bg-[#2563EB] transition-colors flex-1 flex flex-col justify-center">
-               <DollarSign className="w-6 h-6 mb-3 opacity-90" />
-               <h3 className="font-bold text-lg mb-1">Credit Monitoring</h3>
-               <p className="text-sm opacity-90">Detail piutang per bengkel</p>
-            </Link>
+          <div className="flex items-center gap-2">
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="border border-[#E2E8F0] bg-white rounded-lg px-3 py-1.5 text-xs font-semibold text-[#1E293B] shadow-sm outline-none focus:ring-1 focus:ring-[#4F46E5]"
+            >
+              {months.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="border border-[#E2E8F0] bg-white rounded-lg px-3 py-1.5 text-xs font-semibold text-[#1E293B] shadow-sm outline-none focus:ring-1 focus:ring-[#4F46E5]"
+            >
+              {years.map(y => (
+                <option key={y} value={y}>{y}</option>
+              ))}
+            </select>
           </div>
         </div>
 
-        {/* Highest Receivables Table */}
-        <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden mt-2">
-          <div className="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
-            <div>
-              <h3 className="font-bold text-[#1E293B]">Bengkel dengan Piutang Tertinggi</h3>
-              <p className="text-xs text-[#64748B] mt-1">Prioritas collection</p>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 text-[#4F46E5] animate-spin" />
+            <p className="text-xs font-bold text-[#64748B]">Memuat dashboard...</p>
+          </div>
+        ) : (
+          <>
+            {/* Stat Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <StatCard 
+                title="Total Piutang" 
+                value={`Rp ${dashboardData.stats.totalPiutang.toLocaleString('id-ID')}`} 
+                icon={<DollarSign className="w-5 h-5" />} 
+                bgClass="bg-[#3B82F6]"
+                trend=""
+              />
+              <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] p-5 flex flex-col justify-between border border-[#E2E8F0] h-full gap-4">
+                <div className="flex justify-between items-start">
+                  <div className="flex flex-col">
+                    <p className="text-xs font-semibold text-[#64748B] mb-2">Piutang Jatuh Tempo</p>
+                    <h3 className="text-[22px] font-bold text-[#1E293B] leading-none">
+                      Rp {dashboardData.stats.piutangJatuhTempo.toLocaleString('id-ID')}
+                    </h3>
+                  </div>
+                  <div className="w-[42px] h-[42px] rounded-lg flex items-center justify-center shrink-0 bg-[#EF4444] text-white">
+                    <AlertTriangle className="w-5 h-5" />
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 mt-auto">
+                  <span className="text-[11px] font-semibold text-[#EF4444]">
+                    {dashboardData.stats.countBengkelJatuhTempo} bengkel
+                  </span>
+                </div>
+              </div>
+              <StatCard 
+                title="Penjualan MTD" 
+                value={`Rp ${dashboardData.stats.salesMTD.toLocaleString('id-ID')}`} 
+                icon={<TrendingUp className="w-5 h-5" />} 
+                bgClass="bg-[#22C55E]"
+                trend=""
+              />
+              <StatCard 
+                title="Pembelian MTD" 
+                value={`Rp ${dashboardData.stats.purchaseMTD.toLocaleString('id-ID')}`} 
+                icon={<Calendar className="w-5 h-5" />} 
+                bgClass="bg-[#A855F7]"
+                trend=""
+              />
             </div>
-            <Link to="/monitoring-piutang" className="text-sm text-[#4F46E5] font-semibold hover:underline">
-              Lihat Semua
-            </Link>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
-              <thead>
-                <tr className="bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">BENGKEL</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">OUTSTANDING</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">OVERDUE</th>
-                  <th className="py-4 px-6 border-b border-[#E2E8F0]">AGING STATUS</th>
-                </tr>
-              </thead>
-              <tbody className="text-sm">
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Berkah Sekawan Motor</td>
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Rp 15.400.000</td>
-                  <td className="py-4 px-6 text-[#64748B]">45 hari</td>
-                  <td className="py-4 px-6"><div className="h-2 w-full max-w-[100px] rounded-full bg-[#EF4444]"></div></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Jaya Motor Banjarmasin</td>
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Rp 12.800.000</td>
-                  <td className="py-4 px-6 text-[#64748B]">32 hari</td>
-                  <td className="py-4 px-6"><div className="h-2 w-full max-w-[100px] rounded-full bg-[#F59E0B]"></div></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Mandiri Service</td>
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Rp 8.600.000</td>
-                  <td className="py-4 px-6 text-[#64748B]">18 hari</td>
-                  <td className="py-4 px-6"><div className="h-2 w-full max-w-[100px] rounded-full bg-[#22C55E]"></div></td>
-                </tr>
-                <tr className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Abadi Motor</td>
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Rp 6.400.000</td>
-                  <td className="py-4 px-6 text-[#64748B]">65 hari</td>
-                  <td className="py-4 px-6"><div className="h-2 w-full max-w-[100px] rounded-full bg-[#EF4444]"></div></td>
-                </tr>
-                <tr className="hover:bg-[#F8FAFC] transition-colors">
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Mitra Jaya</td>
-                  <td className="py-4 px-6 font-bold text-[#1E293B]">Rp 5.200.000</td>
-                  <td className="py-4 px-6 text-[#64748B]">28 hari</td>
-                  <td className="py-4 px-6"><div className="h-2 w-full max-w-[100px] rounded-full bg-[#F59E0B]"></div></td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        </div>
+
+            {/* Middle Section: Chart and Actions */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+              
+              {/* Chart Section */}
+              <div className="lg:col-span-2 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] p-5 flex flex-col">
+                <h3 className="font-bold text-[#1E293B] mb-6">Penjualan vs Pembelian Bulan Ini (MTD)</h3>
+                
+                <div className="flex-1 min-h-[300px]">
+                  {dashboardData.chartData.length > 0 ? (
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart
+                        data={dashboardData.chartData}
+                        margin={{ top: 10, right: 10, left: 10, bottom: 5 }}
+                      >
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                        <XAxis 
+                          dataKey="label" 
+                          tickLine={false} 
+                          axisLine={false} 
+                          tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} 
+                        />
+                        <YAxis 
+                          domain={[0, maxChartVal]}
+                          tickLine={false} 
+                          axisLine={false} 
+                          tick={{ fill: '#64748B', fontSize: 11, fontWeight: 500 }} 
+                          tickFormatter={(val) => {
+                            if (val >= 1000000) return `Rp ${(val / 1000000).toFixed(1)}jt`;
+                            if (val >= 1000) return `Rp ${(val / 1000).toFixed(0)}rb`;
+                            return `Rp ${val}`;
+                          }}
+                        />
+                        <Tooltip 
+                          formatter={(value, name) => [`Rp ${value.toLocaleString('id-ID')}`, name === 'sales' ? 'Penjualan' : 'Pembelian']}
+                          labelStyle={{ fontWeight: 'bold', color: '#1E293B' }}
+                          contentStyle={{ borderRadius: '8px', border: '1px solid #E2E8F0', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)' }}
+                        />
+                        <Legend 
+                          verticalAlign="top" 
+                          align="right" 
+                          iconType="circle"
+                          iconSize={8}
+                          wrapperStyle={{ paddingBottom: 20, fontSize: 12, fontWeight: 600 }}
+                          formatter={(value) => value === 'sales' ? 'Penjualan' : 'Pembelian'}
+                        />
+                        <Bar dataKey="sales" fill="#22C55E" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                        <Bar dataKey="purchase" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={40} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  ) : (
+                    <div className="flex items-center justify-center h-full text-center text-xs font-semibold text-[#64748B]">
+                      Tidak ada data grafik penjualan/pembelian untuk bulan ini.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Cards */}
+              <div className="flex flex-col gap-4">
+                <Link to="/aging-schedule" className="bg-[#EF4444] text-white p-6 rounded-xl shadow-sm hover:bg-[#DC2626] transition-colors flex-1 flex flex-col justify-center">
+                   <AlertTriangle className="w-6 h-6 mb-3 opacity-90" />
+                   <h3 className="font-bold text-lg mb-1">Jadwal Umur Piutang (Aging Schedule)</h3>
+                   <p className="text-sm opacity-90">Piutang 30-180+ hari</p>
+                </Link>
+                <Link to="/monitoring-piutang" className="bg-[#3B82F6] text-white p-6 rounded-xl shadow-sm hover:bg-[#2563EB] transition-colors flex-1 flex flex-col justify-center">
+                   <DollarSign className="w-6 h-6 mb-3 opacity-90" />
+                   <h3 className="font-bold text-lg mb-1">Pemantauan Kredit</h3>
+                   <p className="text-sm opacity-90">Detail piutang per bengkel</p>
+                </Link>
+              </div>
+            </div>
+
+            {/* Highest Receivables Table */}
+            <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden mt-2">
+              <div className="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-[#1E293B]">Bengkel dengan Piutang Tertinggi</h3>
+                  <p className="text-xs text-[#64748B] mt-1">Prioritas Penagihan</p>
+                </div>
+                <Link to="/monitoring-piutang" className="text-sm text-[#4F46E5] font-semibold hover:underline">
+                  Lihat Semua
+                </Link>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left whitespace-nowrap">
+                  <thead>
+                    <tr className="bg-[#F8FAFC] text-[11px] font-bold text-[#64748B] uppercase tracking-wider">
+                      <th className="py-4 px-6 border-b border-[#E2E8F0]">BENGKEL</th>
+                      <th className="py-4 px-6 border-b border-[#E2E8F0]">SISA TAGIHAN</th>
+                      <th className="py-4 px-6 border-b border-[#E2E8F0]">JATUH TEMPO</th>
+                      <th className="py-4 px-6 border-b border-[#E2E8F0]">STATUS AGING</th>
+                    </tr>
+                  </thead>
+                  <tbody className="text-sm">
+                    {dashboardData.topReceivables.length > 0 ? (
+                      dashboardData.topReceivables.map((r, idx) => (
+                        <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors">
+                          <td className="py-4 px-6 font-bold text-[#1E293B]">{r.customer}</td>
+                          <td className="py-4 px-6 font-bold text-[#1E293B]">
+                            Rp {r.outstanding.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-4 px-6 text-[#64748B]">{r.overdueText}</td>
+                          <td className="py-4 px-6">
+                            <div className={`h-2 w-full max-w-[100px] rounded-full ${r.color}`}></div>
+                          </td>
+                        </tr>
+                      ))
+                    ) : (
+                      <tr>
+                        <td colSpan="4" className="py-8 text-center text-xs font-semibold text-[#64748B]">
+                          Tidak ada data piutang berjalan.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </>
+        )}
 
       </div>
     </DashboardLayout>

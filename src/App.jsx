@@ -5,7 +5,6 @@ import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import DataProduk from './pages/DataProduk';
 import DataPelanggan from './pages/DataPelanggan';
-import MasterSupplier from './pages/MasterSupplier';
 import UserManagement from './pages/UserManagement';
 import DaftarPenjualan from './pages/DaftarPenjualan';
 import ApprovalStokMasuk from './pages/ApprovalStokMasuk';
@@ -31,7 +30,6 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/data-produk" element={<DataProduk />} />
         <Route path="/data-pelanggan" element={<DataPelanggan />} />
-        <Route path="/master-supplier" element={<MasterSupplier />} />
         <Route path="/user-management" element={<UserManagement />} />
         <Route path="/daftar-penjualan" element={<DaftarPenjualan />} />
         <Route path="/approval-stok" element={<ApprovalStokMasuk />} />

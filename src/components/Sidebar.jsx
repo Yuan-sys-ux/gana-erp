@@ -31,11 +31,11 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       label: 'MENU UTAMA',
       items: [
         { name: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, path: '/dashboard' },
-        { name: 'Master Produk', icon: <Package className="w-[18px] h-[18px]" />, path: '/data-produk' },
-        { name: 'Master Pelanggan', icon: <Users className="w-[18px] h-[18px]" />, path: '/data-pelanggan' },
-        { name: 'Master Supplier', icon: <FileText className="w-[18px] h-[18px]" />, path: '/master-supplier' },
-        { name: 'User Management', icon: <Users className="w-[18px] h-[18px]" />, path: '/user-management' },
+        { name: 'Produk', icon: <Package className="w-[18px] h-[18px]" />, path: '/data-produk' },
+        { name: 'Pelanggan', icon: <Users className="w-[18px] h-[18px]" />, path: '/data-pelanggan' },
+        { name: 'Manajemen Pengguna', icon: <Users className="w-[18px] h-[18px]" />, path: '/user-management' },
         { name: 'Daftar Penjualan', icon: <ShoppingCart className="w-[18px] h-[18px]" />, path: '/daftar-penjualan' },
+        { name: 'Target Penjualan', icon: <TrendingUp className="w-[18px] h-[18px]" />, path: '/target-penjualan' },
       ]
     }
   ];
@@ -68,9 +68,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
       label: 'MENU UTAMA',
       items: [
         { name: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, path: '/dashboard' },
-        { name: 'Aging Schedule', icon: <Calendar className="w-[18px] h-[18px]" />, path: '/aging-schedule' },
+        { name: 'Jadwal Umur Piutang', icon: <Calendar className="w-[18px] h-[18px]" />, path: '/aging-schedule' },
         { name: 'Laporan Penjualan', icon: <BarChart2 className="w-[18px] h-[18px]" />, path: '/laporan-penjualan' },
         { name: 'Monitoring Piutang', icon: <DollarSign className="w-[18px] h-[18px]" />, path: '/monitoring-piutang' },
+        { name: 'Target Penjualan', icon: <TrendingUp className="w-[18px] h-[18px]" />, path: '/target-penjualan' },
       ]
     }
   ];
@@ -82,6 +83,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { name: 'Dashboard', icon: <LayoutDashboard className="w-[18px] h-[18px]" />, path: '/dashboard' },
         { name: 'Input Pesanan', icon: <ShoppingCart className="w-[18px] h-[18px]" />, path: '/input-pesanan' },
         { name: 'Laporan Kunjungan', icon: <MapPin className="w-[18px] h-[18px]" />, path: '/laporan-kunjungan' },
+        { name: 'Monitoring Piutang', icon: <DollarSign className="w-[18px] h-[18px]" />, path: '/monitoring-piutang' },
         { name: 'Target Penjualan', icon: <TrendingUp className="w-[18px] h-[18px]" />, path: '/target-penjualan' },
       ]
     }
@@ -165,7 +167,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
           className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-indigo-100 hover:bg-red-500 hover:text-white transition-colors w-full font-medium text-sm"
         >
           <LogOut className="w-[18px] h-[18px]" />
-          <span>Logout</span>
+          <span>Keluar</span>
         </button>
       </div>
       </div>

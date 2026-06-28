@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, Plus, MapPin, Phone, Building2, Edit, X, Trash2 } from 'lucide-react';
-import { getCustomers, saveCustomers, addCustomer } from '../utils/mockDb';
+import { Search, Plus, MapPin, Phone, Building2, Edit, X, Trash2, Loader2 } from 'lucide-react';
+import { customerService } from '../services/customerService';
+import { getCustomers, saveCustomers } from '../utils/mockDb';
 
 export default function DataPelanggan() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -9,9 +10,23 @@ export default function DataPelanggan() {
   const [selectedStatus, setSelectedStatus] = useState('Semua Status');
   
   const [customers, setCustomers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
 
   const loadCustomers = () => {
-    setCustomers(getCustomers());
+    setIsLoading(true);
+    setErrorMsg('');
+    customerService.getAll()
+      .then((res) => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.customers || []);
+        setCustomers(data);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal memuat pelanggan dari API, load lokal:", err);
+        setCustomers(getCustomers());
+        setIsLoading(false);
+      });
   };
 
   useEffect(() => {
@@ -22,25 +37,38 @@ export default function DataPelanggan() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [editingCustomer, setEditingCustomer] = useState(null);
   const [formData, setFormData] = useState({
-    id: '', name: '', address: '', phone: '', outstanding: 0, lastOrder: '-', status: 'Active', city: 'Banjarmasin'
+    id: '', name: '', address: '', phone: '', outstanding: 0, lastOrder: '-', status: 'Active', city: 'Banjarmasin', password: ''
   });
 
   const filteredCustomers = customers.filter(customer => {
+    const name = customer.name || customer.nama || '';
+    const city = customer.city || customer.kota || '';
+    const status = customer.status || 'Active';
+    const address = customer.address || customer.alamat || '';
+    
     const term = searchTerm.toLowerCase();
-    const matchSearch = customer.name.toLowerCase().includes(term);
-    const matchCity = selectedCity === 'Semua Kota' || customer.city === selectedCity;
-    const matchStatus = selectedStatus === 'Semua Status' || customer.status === selectedStatus;
+    const matchSearch = name.toLowerCase().includes(term) || address.toLowerCase().includes(term);
+    const matchCity = selectedCity === 'Semua Kota' || city === selectedCity;
+    const matchStatus = selectedStatus === 'Semua Status' || status === selectedStatus;
     return matchSearch && matchCity && matchStatus;
   });
 
   const handleOpenModal = (customer = null) => {
     if (customer) {
       setEditingCustomer(customer);
-      setFormData(customer);
+      setFormData({
+        ...customer,
+        name: customer.name || customer.nama || '',
+        address: customer.address || customer.alamat || '',
+        phone: customer.phone || customer.telepon || '',
+        outstanding: customer.outstanding || customer.piutang || 0,
+        city: customer.city || customer.kota || 'Banjarmasin',
+        password: customer.password || ''
+      });
     } else {
       setEditingCustomer(null);
       setFormData({
-        id: `PLG-00${customers.length + 1}`, name: '', address: '', phone: '', outstanding: 0, lastOrder: '-', status: 'Active', city: 'Banjarmasin'
+        id: '', name: '', address: '', phone: '', outstanding: 0, lastOrder: '-', status: 'Active', city: 'Banjarmasin', password: ''
       });
     }
     setIsModalOpen(true);
@@ -53,15 +81,63 @@ export default function DataPelanggan() {
 
   const handleSave = (e) => {
     e.preventDefault();
-    if (editingCustomer) {
-      const updatedCustomers = customers.map(c => c.id === editingCustomer.id ? formData : c);
-      saveCustomers(updatedCustomers);
-      loadCustomers();
-    } else {
-      addCustomer(formData);
-      loadCustomers();
+    setIsLoading(true);
+
+    const payload = {
+      nama: formData.name,
+      alamat: formData.address,
+      telepon: formData.phone,
+      piutang: Number(formData.outstanding) || 0,
+      kota: formData.city,
+      status: formData.status
+    };
+
+    if (formData.password) {
+      payload.password = formData.password;
     }
-    handleCloseModal();
+
+    const apiCall = editingCustomer
+      ? customerService.update(editingCustomer.id, payload)
+      : customerService.create(payload);
+
+    apiCall
+      .then(() => {
+        loadCustomers();
+        handleCloseModal();
+      })
+      .catch((err) => {
+        console.error("Gagal menyimpan pelanggan ke API, simpan lokal:", err);
+        const localCustomers = getCustomers();
+        if (editingCustomer) {
+          const updated = localCustomers.map(c => c.id === editingCustomer.id ? {
+            ...c,
+            name: formData.name,
+            address: formData.address,
+            phone: formData.phone,
+            outstanding: Number(formData.outstanding),
+            city: formData.city,
+            status: formData.status,
+            password: formData.password
+          } : c);
+          saveCustomers(updated);
+        } else {
+          const newCust = {
+            id: `PLG-${Date.now()}`,
+            name: formData.name,
+            address: formData.address,
+            phone: formData.phone,
+            outstanding: Number(formData.outstanding),
+            lastOrder: '-',
+            status: formData.status,
+            city: formData.city,
+            password: formData.password
+          };
+          localCustomers.push(newCust);
+          saveCustomers(localCustomers);
+        }
+        loadCustomers();
+        handleCloseModal();
+      });
   };
 
   const confirmDelete = () => {
@@ -69,11 +145,24 @@ export default function DataPelanggan() {
   };
 
   const handleDelete = () => {
-    const updatedCustomers = customers.filter(c => c.id !== editingCustomer.id);
-    saveCustomers(updatedCustomers);
-    loadCustomers();
-    setIsDeleteModalOpen(false);
-    handleCloseModal();
+    if (editingCustomer) {
+      setIsLoading(true);
+      customerService.delete(editingCustomer.id)
+        .then(() => {
+          loadCustomers();
+          setIsDeleteModalOpen(false);
+          handleCloseModal();
+        })
+        .catch((err) => {
+          console.error("Gagal menghapus pelanggan dari API, hapus lokal:", err);
+          const localCustomers = getCustomers();
+          const filtered = localCustomers.filter(c => c.id !== editingCustomer.id);
+          saveCustomers(filtered);
+          loadCustomers();
+          setIsDeleteModalOpen(false);
+          handleCloseModal();
+        });
+    }
   };
 
   return (
@@ -83,7 +172,7 @@ export default function DataPelanggan() {
         {/* Header section */}
         <div className="flex justify-between items-end mb-2">
           <div>
-            <h1 className="text-2xl font-bold text-[#1E293B]">Master Pelanggan</h1>
+            <h1 className="text-2xl font-bold text-[#1E293B]">Pelanggan</h1>
             <p className="text-sm text-[#64748B] mt-1">Kelola data bengkel mitra di Kalimantan Selatan</p>
           </div>
           <button 
@@ -129,66 +218,83 @@ export default function DataPelanggan() {
             onChange={(e) => setSelectedStatus(e.target.value)}
           >
             <option value="Semua Status">Semua Status</option>
-            <option value="Active">Active</option>
-            <option value="Inactive">Inactive</option>
+            <option value="Active">Aktif</option>
+            <option value="Inactive">Tidak Aktif</option>
           </select>
         </div>
 
+        {errorMsg && (
+          <div className="w-full bg-[#FEE2E2] text-[#DC2626] text-sm font-semibold p-4 rounded-lg border border-[#FCA5A5]">
+            {errorMsg}
+          </div>
+        )}
+
         {/* Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredCustomers.map((customer) => (
-            <div key={customer.id} className="bg-white rounded-2xl shadow-[0_4px_20px_-5px_rgba(0,0,0,0.1)] border border-[#E2E8F0] overflow-hidden flex flex-col hover:-translate-y-1 transition-transform duration-300">
-              
-              {/* Card Header (Purple) */}
-              <div className="bg-[#7C3AED] p-5 pb-8 relative">
-                 <div className="flex justify-between items-start mb-4">
-                    <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm">
-                       <Building2 className="w-5 h-5 text-white" />
-                    </div>
-                    <span className={`px-3 py-1 text-white text-[10px] font-bold rounded-full uppercase tracking-wider ${customer.status === 'Active' ? 'bg-[#22C55E]' : 'bg-[#94A3B8]'}`}>
-                       {customer.status}
-                    </span>
-                 </div>
-                 <h3 className="text-xl font-bold text-white mb-1">{customer.name}</h3>
+        {isLoading ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+            <Loader2 className="w-8 h-8 animate-spin text-[#4F46E5] mb-2" />
+            <p className="text-sm text-[#64748B] font-medium">Memuat data pelanggan...</p>
+          </div>
+        ) : filteredCustomers.length === 0 ? (
+          <div className="flex flex-col items-center justify-center p-12 bg-white rounded-2xl border border-[#E2E8F0] shadow-sm">
+            <p className="text-sm text-[#64748B] font-medium">Tidak ada pelanggan ditemukan.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredCustomers.map((customer) => (
+              <div key={customer.id} className="bg-white rounded-2xl shadow-[0_4px_20px_-5px_rgba(0,0,0,0.1)] border border-[#E2E8F0] overflow-hidden flex flex-col hover:-translate-y-1 transition-transform duration-300">
+                
+                {/* Card Header (Purple) */}
+                <div className="bg-[#7C3AED] p-5 pb-8 relative">
+                   <div className="flex justify-between items-start mb-4">
+                      <div className="w-10 h-10 rounded-lg bg-white/20 flex items-center justify-center backdrop-blur-sm">
+                         <Building2 className="w-5 h-5 text-white" />
+                      </div>
+                      <span className={`px-3 py-1 text-white text-[10px] font-bold rounded-full uppercase tracking-wider ${customer.status === 'Active' ? 'bg-[#22C55E]' : 'bg-[#94A3B8]'}`}>
+                         {customer.status === 'Active' ? 'Aktif' : 'Tidak Aktif'}
+                      </span>
+                   </div>
+                   <h3 className="text-xl font-bold text-white mb-1">{customer.name || customer.nama}</h3>
+                </div>
+
+                {/* Card Body */}
+                <div className="p-5 flex-1 flex flex-col gap-4 bg-white relative -mt-4 rounded-t-2xl">
+                   <div className="flex flex-col gap-3">
+                      <div className="flex items-start gap-3">
+                         <MapPin className="w-4 h-4 text-[#94A3B8] mt-0.5 shrink-0" />
+                         <p className="text-sm text-[#475569]">{customer.address || customer.alamat}</p>
+                      </div>
+                      <div className="flex items-center gap-3">
+                         <Phone className="w-4 h-4 text-[#94A3B8] shrink-0" />
+                         <p className="text-sm text-[#475569]">{customer.phone || customer.telepon}</p>
+                      </div>
+                   </div>
+
+                   <div className="border-t border-dashed border-[#E2E8F0] my-2"></div>
+
+                   <div className="grid grid-cols-2 gap-4">
+                      <div className="flex flex-col">
+                         <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">Sisa Tagihan</span>
+                         <span className="text-sm font-bold text-[#DC2626]">Rp {Number(customer.outstanding || customer.piutang || 0).toLocaleString('id-ID')}</span>
+                      </div>
+                      <div className="flex flex-col">
+                         <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">Pesanan Terakhir</span>
+                         <span className="text-sm font-medium text-[#1E293B]">{customer.lastOrder || customer.last_order || '-'}</span>
+                      </div>
+                   </div>
+
+                   <div className="mt-auto pt-4">
+                      <button onClick={() => handleOpenModal(customer)} className="w-full py-2.5 flex items-center justify-center gap-2 border border-[#E0E7FF] text-[#4F46E5] hover:bg-[#EEF2FF] rounded-xl text-sm font-bold transition-colors">
+                         <Edit className="w-4 h-4" />
+                         Edit Detail
+                      </button>
+                   </div>
+                </div>
+
               </div>
-
-              {/* Card Body */}
-              <div className="p-5 flex-1 flex flex-col gap-4 bg-white relative -mt-4 rounded-t-2xl">
-                 <div className="flex flex-col gap-3">
-                    <div className="flex items-start gap-3">
-                       <MapPin className="w-4 h-4 text-[#94A3B8] mt-0.5 shrink-0" />
-                       <p className="text-sm text-[#475569]">{customer.address}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                       <Phone className="w-4 h-4 text-[#94A3B8] shrink-0" />
-                       <p className="text-sm text-[#475569]">{customer.phone}</p>
-                    </div>
-                 </div>
-
-                 <div className="border-t border-dashed border-[#E2E8F0] my-2"></div>
-
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="flex flex-col">
-                       <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">Outstanding</span>
-                       <span className="text-sm font-bold text-[#DC2626]">Rp {Number(customer.outstanding).toLocaleString('id-ID')}</span>
-                    </div>
-                    <div className="flex flex-col">
-                       <span className="text-[11px] font-semibold text-[#94A3B8] uppercase">Last Order</span>
-                       <span className="text-sm font-medium text-[#1E293B]">{customer.lastOrder}</span>
-                    </div>
-                 </div>
-
-                 <div className="mt-auto pt-4">
-                    <button onClick={() => handleOpenModal(customer)} className="w-full py-2.5 flex items-center justify-center gap-2 border border-[#E0E7FF] text-[#4F46E5] hover:bg-[#EEF2FF] rounded-xl text-sm font-bold transition-colors">
-                       <Edit className="w-4 h-4" />
-                       Edit Detail
-                    </button>
-                 </div>
-              </div>
-
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+        )}
 
       </div>
 
@@ -235,13 +341,15 @@ export default function DataPelanggan() {
                 </div>
               </div>
 
+
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">
                   <label className="text-sm font-semibold text-[#334155]">Status</label>
                   <select className="w-full px-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]"
                     value={formData.status} onChange={e => setFormData({...formData, status: e.target.value})} required>
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="Active">Aktif</option>
+                    <option value="Inactive">Tidak Aktif</option>
                   </select>
                 </div>
                 <div className="flex flex-col gap-1.5">
@@ -251,7 +359,10 @@ export default function DataPelanggan() {
                       <span className="text-[#64748B] text-sm">Rp</span>
                     </div>
                     <input type="text" className="w-full pl-9 pr-3 py-2 border border-[#E2E8F0] rounded-lg text-sm focus:ring-1 focus:ring-[#4F46E5]" 
-                      value={formData.outstanding} onChange={e => setFormData({...formData, outstanding: e.target.value.replace(/\D/g, '')})} placeholder="0" />
+                      value={formData.outstanding ? Number(formData.outstanding).toLocaleString('id-ID') : ''} onChange={e => {
+                        const cleanVal = e.target.value.replace(/\D/g, '');
+                        setFormData({...formData, outstanding: cleanVal ? parseInt(cleanVal, 10) : 0});
+                      }} placeholder="0" />
                   </div>
                 </div>
               </div>

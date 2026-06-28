@@ -4,14 +4,32 @@ import { AlertCircle, Package, TrendingUp, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
 import { getProducts, getIncomingStock } from '../utils/mockDb';
+import { productService } from '../services/productService';
+import { purchaseService } from '../services/purchaseService';
 
 export default function DashboardKepalaGudang() {
   const [products, setProducts] = useState([]);
   const [incomingStock, setIncomingStock] = useState([]);
 
   useEffect(() => {
-    setProducts(getProducts());
-    setIncomingStock(getIncomingStock());
+    productService.getAll()
+      .then(res => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.products || []);
+        setProducts(data);
+      })
+      .catch(err => {
+        console.error("Gagal memuat produk dari API, load lokal:", err);
+        setProducts(getProducts());
+      });
+
+    purchaseService.getAll()
+      .then(res => {
+        setIncomingStock(res);
+      })
+      .catch(err => {
+        console.error("Gagal memuat incoming stock dari API, load lokal:", err);
+        setIncomingStock(getIncomingStock());
+      });
   }, []);
 
   const pendingApprovals = incomingStock.filter(s => s.status === 'pending');
@@ -95,7 +113,7 @@ export default function DashboardKepalaGudang() {
                           to="/approval-stok"
                           className="text-xs font-bold text-[#4F46E5] hover:text-[#4338CA] bg-[#EEF2FF] px-3 py-1.5 rounded-lg border border-[#C7D2FE] transition-colors"
                         >
-                          Review & Approve
+                          Tinjau & Setujui
                         </Link>
                       </td>
                     </tr>
@@ -115,7 +133,7 @@ export default function DashboardKepalaGudang() {
         {/* Real-time Stock Section */}
         <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] overflow-hidden mt-2">
           <div className="p-5 border-b border-[#E2E8F0] flex justify-between items-center">
-            <h3 className="font-bold text-[#1E293B]">Real-time Stock (Karton & Liter)</h3>
+            <h3 className="font-bold text-[#1E293B]">Stok Real-time (Karton & Liter)</h3>
             <Link to="/riwayat-stok" className="text-sm text-[#4F46E5] font-semibold hover:underline">
               Riwayat Lengkap
             </Link>
@@ -128,10 +146,10 @@ export default function DashboardKepalaGudang() {
                   ? 'bg-[#FEF3C7] text-[#D97706]' 
                   : 'bg-[#DCFCE7] text-[#16A34A]';
               const statusLabel = p.stokKarton < 70 
-                ? 'Critical' 
+                ? 'Kritis' 
                 : p.stokKarton < 100 
-                  ? 'Low' 
-                  : 'Good';
+                  ? 'Sedikit' 
+                  : 'Baik';
 
               return (
                 <div key={p.id} className="flex items-center justify-between p-4 border border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors rounded-xl">

@@ -1,10 +1,14 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus, X, AlertCircle } from 'lucide-react';
+import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus, X, AlertCircle, Printer } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { getOrders, updateOrderStatus } from '../utils/mockDb';
+import { useLocation } from 'react-router-dom';
+import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
 
 export default function PengirimanBarang() {
   const [deliveries, setDeliveries] = useState({ diproses: [], dikirim: [], terkirim: [] });
+  const location = useLocation();
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -15,25 +19,130 @@ export default function PengirimanBarang() {
   // Custom Alert State
   const [alert, setAlert] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
+  // Product master and printing states
+  const [products, setProducts] = useState([]);
+  const [activePrintOrder, setActivePrintOrder] = useState(null);
+
   const loadDeliveries = () => {
-    const orders = getOrders();
-    setDeliveries({
-      diproses: orders.filter(o => o.status === 'Approved'),
-      dikirim: orders.filter(o => o.status === 'Shipped'),
-      terkirim: orders.filter(o => o.status === 'Delivered' || o.status === 'Invoiced')
-    });
+    orderService.getAll()
+      .then(res => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.orders || []);
+        const mapped = data.map(so => ({
+          id: so.id,
+          date: so.tgl_penjualan || (so.created_at ? new Date(so.created_at).toLocaleDateString('id-ID') : '-'),
+          customer: so.pelanggan?.nama || so.pelanggan?.name || so.customer || '-',
+          address: so.pelanggan?.alamat || so.address || '-',
+          sales: so.user?.nama || so.user?.name || so.sales || 'Sales System',
+          total: Number(so.total_netto) || Number(so.total) || 0,
+          status: so.status || 'Draft',
+          qty: Number(so.qty) || (so.dataDetail ? so.dataDetail.reduce((acc, curr) => acc + (Number(curr.qty) || 0), 0) : 0),
+          paymentMethod: so.metode_bayar || so.paymentMethod || 'cash',
+          items: so.dataDetail || so.items || [],
+          driver: so.driver || '',
+          time: so.time || '',
+          updated_at: so.updated_at || so.created_at || ''
+        }));
+        setDeliveries({
+          diproses: mapped.filter(o => o.status === 'Approved'),
+          dikirim: mapped.filter(o => o.status === 'Shipped'),
+          terkirim: mapped.filter(o => {
+            if (o.status !== 'Delivered' && o.status !== 'Invoiced') return false;
+            if (!o.updated_at) return true;
+            const deliveryTime = new Date(o.updated_at).getTime();
+            const now = Date.now();
+            return (now - deliveryTime) < 24 * 60 * 60 * 1000;
+          })
+        });
+      })
+      .catch(err => {
+        console.error("Gagal load deliveries dari API, load lokal:", err);
+        const orders = getOrders();
+        setDeliveries({
+          diproses: orders.filter(o => o.status === 'Approved'),
+          dikirim: orders.filter(o => o.status === 'Shipped'),
+          terkirim: orders.filter(o => o.status === 'Delivered' || o.status === 'Invoiced')
+        });
+      });
   };
 
   useEffect(() => {
     loadDeliveries();
-  }, []);
+    
+    productService.getAll()
+      .then(res => {
+        const list = Array.isArray(res) ? res : (res?.data || res?.products || res?.produk || []);
+        setProducts(list);
+      })
+      .catch(err => console.error("Gagal load produk untuk surat jalan:", err));
+    
+    // Auto-open modal if specified in query params
+    const queryParams = new URLSearchParams(location.search);
+    const openModalOrderId = queryParams.get('openModal');
+    if (openModalOrderId) {
+      setTimeout(() => {
+        handleOpenModal(openModalOrderId);
+      }, 100);
+    }
+  }, [location.search]);
 
   const [searchTerm, setSearchTerm] = useState('');
 
   const filterBySearch = (arr) => arr.filter(item => 
-    item.id.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    String(item.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.customer.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const [visibleSlots, setVisibleSlots] = useState([null, null, null, null, null, null]);
+
+  const filteredDiproses = useMemo(() => {
+    return filterBySearch(deliveries.diproses);
+  }, [deliveries.diproses, searchTerm]);
+
+  useEffect(() => {
+    const diprosesList = filteredDiproses;
+    
+    setVisibleSlots(prevSlots => {
+      // 1. Clean up slots: set to null if the item is no longer in diprosesList
+      let newSlots = prevSlots.map(slot => 
+        slot && diprosesList.some(item => item.id === slot.id) 
+          ? diprosesList.find(item => item.id === slot.id) 
+          : null
+      );
+
+      const isInitial = prevSlots.every(s => s === null);
+
+      // 2. Find candidates: items in diprosesList that are not in newSlots
+      let candidates = diprosesList.filter(item => 
+        !newSlots.some(slot => slot && slot.id === item.id)
+      );
+
+      if (isInitial) {
+        // Initial load: fill from the front
+        for (let i = 0; i < 6; i++) {
+          if (candidates.length > 0) {
+            newSlots[i] = candidates.shift();
+          }
+        }
+      } else {
+        // Not initial load: fill empty slots by popping from the back of candidates
+        for (let i = 0; i < 6; i++) {
+          if (newSlots[i] === null && candidates.length > 0) {
+            newSlots[i] = candidates.pop();
+          }
+        }
+      }
+
+      return newSlots;
+    });
+  }, [filteredDiproses]);
+
+  const activeVisibleItems = useMemo(() => {
+    return visibleSlots.filter(Boolean);
+  }, [visibleSlots]);
+
+  const excessCount = useMemo(() => {
+    return Math.max(0, filteredDiproses.length - activeVisibleItems.length);
+  }, [filteredDiproses, activeVisibleItems]);
 
   const showAlert = (type, title, message) => {
     setAlert({ isOpen: true, type, title, message });
@@ -77,33 +186,64 @@ export default function PengirimanBarang() {
 
     const fullDriverInfo = `${driverName.trim()} (${plateNumber.trim().toUpperCase()})`;
     
-    updateOrderStatus(selectedOrderId, 'Shipped', { driver: fullDriverInfo });
-    loadDeliveries();
-    
-    showAlert(
-      'success',
-      'Surat Jalan Dibuat!',
-      `Surat Jalan untuk Pesanan ${selectedOrderId} berhasil dibuat. Armada pengiriman dialokasikan ke ${fullDriverInfo}.`
-    );
+    // Determine if mock ID or real DB ID
+    const isMockId = isNaN(Number(selectedOrderId));
+    const apiUpdate = isMockId
+      ? Promise.reject("Mock ID")
+      : orderService.update(selectedOrderId, { status: 'Shipped', driver: fullDriverInfo });
 
-    handleCloseModal();
+    apiUpdate
+      .then(() => {
+        loadDeliveries();
+        showAlert(
+          'success',
+          'Surat Jalan Dibuat!',
+          `Surat Jalan untuk Pesanan ${selectedOrderId} berhasil dibuat. Armada pengiriman dialokasikan ke ${fullDriverInfo}.`
+        );
+        handleCloseModal();
+      })
+      .catch(() => {
+        updateOrderStatus(selectedOrderId, 'Shipped', { driver: fullDriverInfo });
+        loadDeliveries();
+        showAlert(
+          'success',
+          'Surat Jalan Dibuat!',
+          `Surat Jalan untuk Pesanan ${selectedOrderId} berhasil dibuat. Armada pengiriman dialokasikan ke ${fullDriverInfo}.`
+        );
+        handleCloseModal();
+      });
   };
 
   const handleSelesaikanPengiriman = (id) => {
-    const item = deliveries.dikirim.find(d => d.id === id);
+    const item = deliveries.dikirim.find(d => String(d.id) === String(id));
     if (!item) return;
     
     const d = new Date();
     const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' WITA';
 
-    updateOrderStatus(id, 'Delivered', { time: timeStr });
-    loadDeliveries();
+    const isMockId = isNaN(Number(id));
+    const apiUpdate = isMockId
+      ? Promise.reject("Mock ID")
+      : orderService.update(id, { status: 'Delivered', time: timeStr });
 
-    showAlert(
-      'success',
-      'Pengiriman Selesai!',
-      `Pesanan ${id} telah berhasil diterima oleh pelanggan pada pukul ${timeStr}.`
-    );
+    apiUpdate
+      .then(() => {
+        loadDeliveries();
+        showAlert(
+          'success',
+          'Pengiriman Selesai!',
+          `Pesanan ${id} telah berhasil diterima oleh pelanggan pada pukul ${timeStr}.`
+        );
+      })
+      .catch(() => {
+        updateOrderStatus(id, 'Delivered', { time: timeStr });
+        loadDeliveries();
+        showAlert(
+          'success',
+          'Pengiriman Selesai!',
+          `Pesanan ${id} telah berhasil diterima oleh pelanggan pada pukul ${timeStr}.`
+        );
+      });
   };
 
   // Get details of selected order for preview in modal
@@ -111,6 +251,13 @@ export default function PengirimanBarang() {
     if (!selectedOrderId) return null;
     return deliveries.diproses.find(o => o.id === selectedOrderId);
   }, [selectedOrderId, deliveries.diproses]);
+
+  const handlePrint = (order) => {
+    setActivePrintOrder(order);
+    setTimeout(() => {
+      window.print();
+    }, 150);
+  };
 
   return (
     <DashboardLayout>
@@ -169,31 +316,31 @@ export default function PengirimanBarang() {
           </div>
         </div>
 
-        {/* Kanban Board */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 h-full pb-8">
-          
-          {/* Column 1: Diproses */}
-          <div className="flex flex-col gap-4">
-            <div className="bg-[#F8FAFC] border border-[#E2E8F0] p-4 rounded-xl flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <PackageOpen className="w-5 h-5 text-[#64748B]" />
-                <h3 className="font-bold text-[#1E293B]">Sedang Diproses</h3>
-              </div>
+        {/* Section: Sedang Diproses */}
+        <div className="flex flex-col gap-4 bg-[#F8FAFC] border border-[#E2E8F0] p-5 rounded-2xl shadow-sm mb-6">
+          <div className="flex items-center justify-between border-b border-[#E2E8F0] pb-3">
+            <div className="flex items-center gap-2">
+              <PackageOpen className="w-5 h-5 text-[#64748B]" />
+              <h3 className="font-bold text-[#1E293B] text-base">Sedang Diproses</h3>
               <span className="bg-[#E2E8F0] text-[#475569] text-xs font-bold px-2 py-1 rounded-full">{deliveries.diproses.length}</span>
             </div>
-            
-            <div className="flex flex-col gap-3">
-              {filterBySearch(deliveries.diproses).map((item, idx) => (
-                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] hover:border-[#CBD5E1] transition-colors relative overflow-hidden">
+          </div>
+          
+          <div className="flex items-center gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
+              {activeVisibleItems.map((item) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] hover:border-[#CBD5E1] transition-all relative overflow-hidden flex flex-col justify-between">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#94A3B8]"></div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
-                    <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
-                  </div>
-                  <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
-                  <div className="flex items-start gap-1.5 text-[#64748B]">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <p className="text-xs leading-relaxed">{item.address}</p>
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
+                      <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
+                    </div>
+                    <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
+                    <div className="flex items-start gap-1.5 text-[#64748B]">
+                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <p className="text-xs leading-relaxed">{item.address}</p>
+                    </div>
                   </div>
                   <button 
                     onClick={() => handleOpenModal(item.id)}
@@ -203,80 +350,118 @@ export default function PengirimanBarang() {
                   </button>
                 </div>
               ))}
-              {filterBySearch(deliveries.diproses).length === 0 && (
-                <p className="text-xs text-center py-6 text-[#94A3B8]">Tidak ada pengiriman dalam proses.</p>
+              {activeVisibleItems.length === 0 && (
+                <div className="col-span-3 text-center py-8">
+                  <p className="text-xs text-[#94A3B8]">Tidak ada pengiriman dalam proses.</p>
+                </div>
               )}
             </div>
-          </div>
 
-          {/* Column 2: Sedang Dikirim */}
-          <div className="flex flex-col gap-4">
-            <div className="bg-[#EEF2FF] border border-[#C7D2FE] p-4 rounded-xl flex items-center justify-between">
+            {excessCount > 0 && (
+              <div 
+                className="w-12 h-12 rounded-full bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5] flex items-center justify-center font-bold text-sm shrink-0 shadow-sm animate-pulse cursor-pointer hover:bg-[#E0E7FF] transition-all"
+                title={`${excessCount} pesanan lainnya sedang antre`}
+              >
+                +{excessCount}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Section: Status Pengiriman (Bottom Board) */}
+        <div className="flex flex-col gap-6 pb-8">
+          
+          {/* Section: Sedang Dikirim */}
+          <div className="flex flex-col gap-4 bg-[#EEF2FF] border border-[#C7D2FE] p-5 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between border-b border-[#C7D2FE] pb-3">
               <div className="flex items-center gap-2">
                 <Truck className="w-5 h-5 text-[#4F46E5]" />
-                <h3 className="font-bold text-[#1E40AF]">Sedang Dikirim</h3>
+                <h3 className="font-bold text-[#1E40AF] text-base">Sedang Dikirim</h3>
+                <span className="bg-[#C7D2FE] text-[#1E40AF] text-xs font-bold px-2 py-1 rounded-full">{deliveries.dikirim.length}</span>
               </div>
-              <span className="bg-[#C7D2FE] text-[#1E40AF] text-xs font-bold px-2 py-1 rounded-full">{deliveries.dikirim.length}</span>
             </div>
             
-            <div className="flex flex-col gap-3">
-              {filterBySearch(deliveries.dikirim).map((item, idx) => (
-                <div key={item.id} className="bg-white p-5 rounded-xl shadow-md border border-[#C7D2FE] relative overflow-hidden">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {filterBySearch(deliveries.dikirim).map((item) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-md border border-[#C7D2FE] relative overflow-hidden flex flex-col justify-between">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#4F46E5]"></div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
-                    <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
+                      <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
+                    </div>
+                    <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
+                    <div className="flex items-start gap-1.5 text-[#64748B] mb-3">
+                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                      <p className="text-xs leading-relaxed">{item.address}</p>
+                    </div>
+                    <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-2.5 flex items-center gap-2 mb-4">
+                      <div className="w-6 h-6 bg-[#E2E8F0] rounded-full flex items-center justify-center shrink-0">🚚</div>
+                      <p className="text-xs font-semibold text-[#334155] truncate">{item.driver}</p>
+                    </div>
                   </div>
-                  <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
-                  <div className="flex items-start gap-1.5 text-[#64748B] mb-3">
-                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                    <p className="text-xs leading-relaxed">{item.address}</p>
+                  <div className="flex gap-2 mt-4">
+                    <button 
+                      onClick={() => handleSelesaikanPengiriman(item.id)}
+                      className="flex-1 py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold rounded-lg transition-colors"
+                    >
+                      Selesaikan
+                    </button>
+                    <button 
+                      onClick={() => handlePrint(item)}
+                      className="px-3 py-2 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] hover:text-[#1E293B] rounded-lg transition-colors flex items-center justify-center gap-1.5 text-xs font-bold"
+                      title="Cetak Surat Jalan"
+                    >
+                      <Printer className="w-3.5 h-3.5" />
+                      Cetak SJ
+                    </button>
                   </div>
-                  <div className="bg-[#F8FAFC] border border-[#E2E8F0] rounded-lg p-2.5 flex items-center gap-2 mb-4">
-                    <div className="w-6 h-6 bg-[#E2E8F0] rounded-full flex items-center justify-center shrink-0">🚚</div>
-                    <p className="text-xs font-semibold text-[#334155] truncate">{item.driver}</p>
-                  </div>
-                  <button 
-                    onClick={() => handleSelesaikanPengiriman(item.id)}
-                    className="w-full py-2 bg-[#4F46E5] hover:bg-[#4338CA] text-white text-xs font-bold rounded-lg transition-colors"
-                  >
-                    Selesaikan Pengiriman
-                  </button>
                 </div>
               ))}
               {filterBySearch(deliveries.dikirim).length === 0 && (
-                <p className="text-xs text-center py-6 text-[#94A3B8]">Tidak ada armada pengiriman aktif.</p>
+                <div className="col-span-3 text-center py-8">
+                  <p className="text-xs text-[#94A3B8]">Tidak ada armada pengiriman aktif.</p>
+                </div>
               )}
             </div>
           </div>
 
-          {/* Column 3: Terkirim */}
-          <div className="flex flex-col gap-4">
-            <div className="bg-[#F0FDF4] border border-[#BBF7D0] p-4 rounded-xl flex items-center justify-between">
+          {/* Section: Terkirim */}
+          <div className="flex flex-col gap-4 bg-[#F0FDF4] border border-[#BBF7D0] p-5 rounded-2xl shadow-sm">
+            <div className="flex items-center justify-between border-b border-[#BBF7D0] pb-3">
               <div className="flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-[#16A34A]" />
-                <h3 className="font-bold text-[#166534]">Terkirim Hari Ini</h3>
+                <h3 className="font-bold text-[#166534] text-base">Terkirim Hari Ini</h3>
+                <span className="bg-[#BBF7D0] text-[#166534] text-xs font-bold px-2 py-1 rounded-full">{deliveries.terkirim.length}</span>
               </div>
-              <span className="bg-[#BBF7D0] text-[#166534] text-xs font-bold px-2 py-1 rounded-full">{deliveries.terkirim.length}</span>
             </div>
             
-            <div className="flex flex-col gap-3">
-              {filterBySearch(deliveries.terkirim).map((item, idx) => (
-                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] relative overflow-hidden opacity-75 hover:opacity-100 transition-opacity">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              {filterBySearch(deliveries.terkirim).map((item) => (
+                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] relative overflow-hidden opacity-75 hover:opacity-100 transition-opacity flex flex-col justify-between">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#16A34A]"></div>
-                  <div className="flex justify-between items-start mb-3">
-                    <span className="text-xs font-bold text-[#16A34A] bg-[#DCFCE7] px-2 py-1 rounded">{item.id}</span>
-                    <span className="text-[11px] font-bold text-[#64748B]">{item.time}</span>
+                  <div>
+                    <div className="flex justify-between items-start mb-3">
+                      <span className="text-xs font-bold text-[#16A34A] bg-[#DCFCE7] px-2 py-1 rounded">{item.id}</span>
+                      <span className="text-[11px] font-bold text-[#64748B]">{item.time}</span>
+                    </div>
+                    <h4 className="font-bold text-[#1E293B] mb-2 line-through decoration-[#94A3B8]">{item.customer}</h4>
                   </div>
-                  <h4 className="font-bold text-[#1E293B] mb-2 line-through decoration-[#94A3B8]">{item.customer}</h4>
                   <div className="flex justify-between items-center mt-3 pt-3 border-t border-[#E2E8F0]">
                     <span className="text-xs text-[#64748B] font-semibold">{item.qty} Dus</span>
-                    <span className="text-[10px] font-bold text-[#16A34A] flex items-center gap-1"><CheckCircle2 className="w-3 h-3"/> Berhasil</span>
+                    <button 
+                      onClick={() => handlePrint(item)}
+                      className="px-2.5 py-1.5 border border-[#E2E8F0] hover:bg-[#F8FAFC] text-[#475569] hover:text-[#1E293B] rounded-lg transition-colors flex items-center gap-1 text-[10px] font-bold font-sans"
+                    >
+                      <Printer className="w-3 h-3" /> Cetak SJ
+                    </button>
                   </div>
                 </div>
               ))}
               {filterBySearch(deliveries.terkirim).length === 0 && (
-                <p className="text-xs text-center py-6 text-[#94A3B8]">Belum ada pengiriman diselesaikan hari ini.</p>
+                <div className="col-span-3 text-center py-8">
+                  <p className="text-xs text-[#94A3B8]">Belum ada pengiriman diselesaikan hari ini.</p>
+                </div>
               )}
             </div>
           </div>
@@ -379,6 +564,112 @@ export default function PengirimanBarang() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+      {/* Printable Surat Jalan Layout (Only visible during print) */}
+      {activePrintOrder && (
+        <div id="printable-surat-jalan" className="hidden print:block font-mono text-black p-8 bg-white animate-fade-in" style={{ fontSize: '12px', lineHeight: '1.4' }}>
+          <style>{`
+            @media print {
+              body * {
+                visibility: hidden !important;
+              }
+              #printable-surat-jalan, #printable-surat-jalan * {
+                visibility: visible !important;
+              }
+              #printable-surat-jalan {
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
+                display: block !important;
+                background: white !important;
+                color: black !important;
+              }
+            }
+          `}</style>
+          
+          {/* Company Brand Header */}
+          <div className="flex justify-between items-start border-b-2 border-black pb-4 mb-4">
+            <div>
+              <h1 className="text-xl font-bold uppercase tracking-wider">CV. GANA</h1>
+              <p className="text-xs">Distributor Pelumas & Suku Cadang</p>
+              <p className="text-xs">Banjarmasin, Kalimantan Selatan</p>
+            </div>
+            <div className="text-right">
+              <h2 className="text-lg font-bold uppercase">SURAT JALAN</h2>
+              <p className="text-xs font-bold">No. DO: {activePrintOrder.id}</p>
+              <p className="text-xs">Tanggal: {activePrintOrder.date}</p>
+            </div>
+          </div>
+
+          {/* Customer & Delivery metadata */}
+          <div className="grid grid-cols-2 gap-4 mb-6">
+            <div>
+              <p className="text-xs font-bold text-gray-700 uppercase font-sans">Kepada Yth:</p>
+              <p className="text-sm font-bold font-sans">{activePrintOrder.customer}</p>
+              <p className="text-xs whitespace-pre-wrap max-w-xs font-sans mt-1">{activePrintOrder.address}</p>
+            </div>
+            <div className="flex flex-col gap-1 text-right font-sans">
+              <p className="text-xs"><span className="font-semibold">Sales Rep:</span> {activePrintOrder.sales}</p>
+              <p className="text-xs"><span className="font-semibold">Armada/Driver:</span> {activePrintOrder.driver || '-'}</p>
+              <p className="text-xs"><span className="font-semibold">Metode Bayar:</span> <span className="uppercase">{activePrintOrder.paymentMethod || 'Cash'}</span></p>
+            </div>
+          </div>
+
+          {/* Products table */}
+          <table className="w-full text-left border-collapse border-y border-black mb-8 font-sans">
+            <thead>
+              <tr className="border-b border-black text-xs font-bold uppercase">
+                <th className="py-2 px-1 w-10 text-center">NO</th>
+                <th className="py-2 px-2">DESKRIPSI PRODUK</th>
+                <th className="py-2 px-2 w-24 text-center">QUANTITY</th>
+                <th className="py-2 px-2 w-32 text-center">KETERANGAN</th>
+              </tr>
+            </thead>
+            <tbody>
+              {activePrintOrder.items && activePrintOrder.items.length > 0 ? (
+                activePrintOrder.items.map((item, idx) => {
+                  const prod = products.find(p => String(p.id || p.id_produk) === String(item.produk_id || item.id));
+                  const brand = prod?.brand || '';
+                  const name = prod ? (prod.name || prod.nama) : (item.name || item.nama || `Produk ID: ${item.produk_id}`);
+                  const sae = prod?.sae || '';
+                  const kemasan = prod?.kemasan || '';
+                  
+                  const desc = brand ? `${brand} - ${name} (${sae}, ${kemasan})` : name;
+
+                  return (
+                    <tr key={idx} className="border-b border-gray-200 text-xs">
+                      <td className="py-2 px-1 text-center">{idx + 1}</td>
+                      <td className="py-2 px-2 font-semibold">{desc}</td>
+                      <td className="py-2 px-2 text-center font-bold">{item.qty} Dus</td>
+                      <td className="py-2 px-2 text-center">-</td>
+                    </tr>
+                  );
+                })
+              ) : (
+                <tr>
+                  <td colSpan="4" className="py-4 text-center text-gray-500 italic">Tidak ada detail produk.</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+
+          {/* Signature Boxes */}
+          <div className="grid grid-cols-3 gap-4 text-center mt-12 pt-8 font-sans">
+            <div className="flex flex-col justify-between h-24">
+              <p className="text-xs font-semibold">Tanda Terima / Penerima,</p>
+              <p className="text-xs">( ____________________ )</p>
+            </div>
+            <div className="flex flex-col justify-between h-24">
+              <p className="text-xs font-semibold">Sopir / Pengirim,</p>
+              <p className="text-xs">( ____________________ )</p>
+            </div>
+            <div className="flex flex-col justify-between h-24">
+              <p className="text-xs font-semibold">Kepala Gudang,</p>
+              <p className="text-xs">( ____________________ )</p>
+            </div>
           </div>
         </div>
       )}

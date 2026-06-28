@@ -1,16 +1,52 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, Plus, Edit2, Trash2, Shield, X } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, Shield, X, Loader2 } from 'lucide-react';
+import { userService } from '../services/userService';
 
 export default function UserManagement() {
-  const [users, setUsers] = useState([
-    { id: 1, name: 'Admin Utama', username: 'admin', role: 'Admin', status: 'Active', created: '1/1/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#F3E8FF] text-[#9333EA]' },
-    { id: 2, name: 'Kepala Gudang', username: 'kepala', role: 'Kepala Gudang', status: 'Active', created: '15/1/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#DBEAFE] text-[#2563EB]' },
-    { id: 3, name: 'Staff Gudang', username: 'staff', role: 'Staff Gudang', status: 'Active', created: '20/1/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#CCFBF1] text-[#0D9488]' },
-    { id: 4, name: 'Pak Tigana', username: 'tigana', role: 'Owner', status: 'Active', created: '1/1/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#FFEDD5] text-[#EA580C]' },
-    { id: 5, name: 'Fernando', username: 'fernando', role: 'Sales', status: 'Active', created: '1/2/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#DCFCE7] text-[#16A34A]' },
-    { id: 6, name: 'Budi Sales', username: 'budi', role: 'Sales', status: 'Active', created: '10/3/2026', avatarColor: 'bg-[#4F46E5]', roleColor: 'bg-[#DCFCE7] text-[#16A34A]' },
-  ]);
+  const [users, setUsers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const getRoleColors = (role) => {
+    switch(role) {
+      case 'Admin': return 'bg-[#F3E8FF] text-[#9333EA]';
+      case 'Kepala Gudang': return 'bg-[#DBEAFE] text-[#2563EB]';
+      case 'Staff Gudang': return 'bg-[#CCFBF1] text-[#0D9488]';
+      case 'Owner': return 'bg-[#FFEDD5] text-[#EA580C]';
+      case 'Sales': return 'bg-[#DCFCE7] text-[#16A34A]';
+      default: return 'bg-[#F1F5F9] text-[#64748B]';
+    }
+  };
+
+  const loadUsers = () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    userService.getAllUsers()
+      .then((data) => {
+        const mapped = data.map(u => ({
+          id: u.id,
+          name: u.name || u.nama || '',
+          username: u.username || '',
+          role: u.role || 'Admin',
+          status: u.status || 'Active',
+          created: u.created || (u.created_at ? new Date(u.created_at).toLocaleDateString('id-ID') : '-'),
+          avatarColor: 'bg-[#4F46E5]',
+          roleColor: getRoleColors(u.role)
+        }));
+        setUsers(mapped);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal memuat user:", err);
+        setErrorMsg("Gagal memuat data user dari backend.");
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadUsers();
+  }, []);
 
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('Semua Role');
@@ -20,7 +56,7 @@ export default function UserManagement() {
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState(null);
   const [modalMode, setModalMode] = useState('add'); // 'add' or 'edit'
-  const [formData, setFormData] = useState({ id: null, name: '', username: '', role: 'Admin', status: 'Active' });
+  const [formData, setFormData] = useState({ id: null, name: '', username: '', role: 'Admin', status: 'Active', password: '' });
   const [validationError, setValidationError] = useState('');
 
   // Filtering Logic
@@ -55,22 +91,32 @@ export default function UserManagement() {
 
   const handleDelete = () => {
     if (userToDelete) {
-      setUsers(users.filter(u => u.id !== userToDelete.id));
-      setIsDeleteModalOpen(false);
-      setUserToDelete(null);
+      setIsLoading(true);
+      userService.delete(userToDelete.id, userToDelete.role)
+        .then(() => {
+          loadUsers();
+          setIsDeleteModalOpen(false);
+          setUserToDelete(null);
+        })
+        .catch((err) => {
+          console.error("Gagal menghapus user:", err);
+          setErrorMsg("Gagal menghapus user dari backend.");
+          setIsLoading(false);
+          setIsDeleteModalOpen(false);
+        });
     }
   };
 
   const openAddModal = () => {
     setModalMode('add');
-    setFormData({ id: null, name: '', username: '', role: 'Admin', status: 'Active' });
+    setFormData({ id: null, name: '', username: '', role: 'Admin', status: 'Active', password: '' });
     setValidationError('');
     setIsModalOpen(true);
   };
 
   const openEditModal = (user) => {
     setModalMode('edit');
-    setFormData(user);
+    setFormData({ ...user, password: '' });
     setValidationError('');
     setIsModalOpen(true);
   };
@@ -78,17 +124,6 @@ export default function UserManagement() {
   const closeModal = () => {
     setIsModalOpen(false);
     setValidationError('');
-  };
-
-  const getRoleColors = (role) => {
-    switch(role) {
-      case 'Admin': return 'bg-[#F3E8FF] text-[#9333EA]';
-      case 'Kepala Gudang': return 'bg-[#DBEAFE] text-[#2563EB]';
-      case 'Staff Gudang': return 'bg-[#CCFBF1] text-[#0D9488]';
-      case 'Owner': return 'bg-[#FFEDD5] text-[#EA580C]';
-      case 'Sales': return 'bg-[#DCFCE7] text-[#16A34A]';
-      default: return 'bg-[#F1F5F9] text-[#64748B]';
-    }
   };
 
   const handleSave = (e) => {
@@ -122,6 +157,11 @@ export default function UserManagement() {
         return;
       }
     }
+
+    if (modalMode === 'add' && !formData.password.trim()) {
+      setValidationError('Password wajib diisi untuk user baru.');
+      return;
+    }
     
     const updatedFormData = {
       ...formData,
@@ -129,19 +169,33 @@ export default function UserManagement() {
       username: cleanedUsername
     };
 
-    if (modalMode === 'add') {
-      const newUser = {
-        ...updatedFormData,
-        id: Date.now(),
-        created: new Date().toLocaleDateString('id-ID'),
-        avatarColor: 'bg-[#4F46E5]',
-        roleColor: getRoleColors(updatedFormData.role)
-      };
-      setUsers([...users, newUser]);
-    } else {
-      setUsers(users.map(u => u.id === updatedFormData.id ? { ...updatedFormData, roleColor: getRoleColors(updatedFormData.role) } : u));
+    setIsLoading(true);
+
+    const payload = {
+      nama: updatedFormData.name,
+      username: updatedFormData.username,
+      role: updatedFormData.role,
+      status: updatedFormData.status,
+    };
+
+    if (updatedFormData.password) {
+      payload.password = updatedFormData.password;
     }
-    closeModal();
+
+    const apiCall = modalMode === 'add'
+      ? userService.create(payload)
+      : userService.update(updatedFormData.id, payload);
+
+    apiCall
+      .then(() => {
+        loadUsers();
+        closeModal();
+      })
+      .catch((err) => {
+        console.error("Gagal menyimpan user:", err);
+        setValidationError("Gagal menyimpan data user ke backend.");
+        setIsLoading(false);
+      });
   };
 
   return (
@@ -151,7 +205,7 @@ export default function UserManagement() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
-            <h2 className="text-xl font-bold text-[#1E293B]">User Management</h2>
+            <h2 className="text-xl font-bold text-[#1E293B]">Manajemen Pengguna</h2>
             <p className="text-sm text-[#64748B] mt-1">Kelola hak akses pengguna sistem</p>
           </div>
           <button 
@@ -161,6 +215,12 @@ export default function UserManagement() {
             <Plus className="w-4 h-4" /> Tambah User
           </button>
         </div>
+
+        {errorMsg && (
+          <div className="w-full bg-[#FEE2E2] text-[#DC2626] text-sm font-semibold p-4 rounded-lg border border-[#FCA5A5]">
+            {errorMsg}
+          </div>
+        )}
 
         {/* Search & Filter */}
         <div className="flex flex-col sm:flex-row gap-4">
@@ -195,7 +255,7 @@ export default function UserManagement() {
             <h3 className="text-2xl font-bold text-[#1E293B]">{stats.total}</h3>
           </div>
           <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] p-5">
-            <p className="text-xs font-semibold text-[#64748B] mb-1">Active</p>
+            <p className="text-xs font-semibold text-[#64748B] mb-1">Aktif</p>
             <h3 className="text-2xl font-bold text-[#22C55E]">{stats.active}</h3>
           </div>
           <div className="bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] p-5">
@@ -223,7 +283,16 @@ export default function UserManagement() {
                 </tr>
               </thead>
               <tbody className="text-sm">
-                {filteredUsers.length > 0 ? (
+                {isLoading ? (
+                  <tr>
+                    <td colSpan="6" className="py-8 text-center text-[#64748B]">
+                      <div className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin text-[#4F46E5]" />
+                        <span>Memuat data user...</span>
+                      </div>
+                    </td>
+                  </tr>
+                ) : filteredUsers.length > 0 ? (
                   filteredUsers.map((user) => (
                     <tr key={user.id} className="border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors last:border-0">
                       <td className="py-4 px-6 font-semibold text-[#1E293B] flex items-center gap-3">
@@ -240,7 +309,7 @@ export default function UserManagement() {
                       </td>
                       <td className="py-4 px-6">
                         <span className={`px-2.5 py-1 rounded-full text-[11px] font-bold ${user.status === 'Active' ? 'bg-[#DCFCE7] text-[#16A34A]' : 'bg-[#FEE2E2] text-[#EF4444]'}`}>
-                          {user.status}
+                          {user.status === 'Active' ? 'Aktif' : 'Tidak Aktif'}
                         </span>
                       </td>
                       <td className="py-4 px-6 text-[#64748B]">{user.created}</td>
@@ -279,13 +348,13 @@ export default function UserManagement() {
         <div className="bg-[#F8FAFC] rounded-xl border border-[#E2E8F0] p-6 mt-2">
           <div className="flex items-center gap-2 mb-6">
             <Shield className="w-5 h-5 text-[#4F46E5]" />
-            <h3 className="font-bold text-[#1E293B]">Role Permissions Overview</h3>
+            <h3 className="font-bold text-[#1E293B]">Ringkasan Hak Akses Role</h3>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0]">
               <h4 className="font-bold text-[#9333EA] mb-2">Admin</h4>
-              <p className="text-sm text-[#475569]">Full access - Manajemen data master, user, dan transaksi</p>
+              <p className="text-sm text-[#475569]">Akses penuh - Manajemen data, pengguna, dan transaksi</p>
             </div>
             <div className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0]">
               <h4 className="font-bold text-[#2563EB] mb-2">Kepala Gudang</h4>
@@ -377,11 +446,23 @@ export default function UserManagement() {
                 <select 
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                  className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] mb-4"
                 >
-                  <option value="Active">Active</option>
-                  <option value="Inactive">Inactive</option>
+                  <option value="Active">Aktif</option>
+                  <option value="Inactive">Tidak Aktif</option>
                 </select>
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-[#1E293B] mb-2 font-sans">
+                  Password {modalMode === 'add' ? <span className="text-[#EF4444]">*</span> : <span className="text-[#64748B]">(Kosongkan jika tidak ingin diubah)</span>}
+                </label>
+                <input 
+                  type="password" 
+                  value={formData.password || ''}
+                  onChange={(e) => setFormData({...formData, password: e.target.value})}
+                  className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
+                  placeholder={modalMode === 'add' ? "Masukkan password..." : "Masukkan password baru..."}
+                />
               </div>
               
               <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#E2E8F0]">

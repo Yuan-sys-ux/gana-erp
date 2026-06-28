@@ -1,45 +1,82 @@
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { MapPin, Image as ImageIcon, Calendar, Plus, Camera, Check, DollarSign, X, Upload } from 'lucide-react';
+import { MapPin, Image as ImageIcon, Calendar, Plus, Camera, Check, DollarSign, X, Upload, Loader2 } from 'lucide-react';
+import { visitService } from '../services/visitService';
+import { customerService } from '../services/customerService';
+import { getCustomers } from '../utils/mockDb';
 
 export default function LaporanKunjungan() {
-  const [visits, setVisits] = useState([
-    {
-      name: 'Berkah Sekawan Motor',
-      datetime: '28 Apr 2026 • 10:30',
-      description: 'Diskusi kebutuhan oli untuk bulan depan. Owner tertarik dengan promo Kixx G1.',
-      orderValue: 'Rp 5.400.000',
-      hasOrder: true,
-      photoUrl: null
-    },
-    {
-      name: 'Jaya Motor',
-      datetime: '28 Apr 2026 • 14:15',
-      description: 'Follow up piutang bulan lalu. Belum ada order baru.',
-      orderValue: null,
-      hasOrder: false,
-      photoUrl: null
-    },
-    {
-      name: 'Mandiri Service',
-      datetime: '27 Apr 2026 • 09:00',
-      description: 'Kunjungan rutin. Order 12 dus Petronas Syntium 5000.',
-      orderValue: 'Rp 4.200.000',
-      hasOrder: true,
-      photoUrl: null
-    },
-    {
-      name: 'Abadi Motor',
-      datetime: '27 Apr 2026 • 16:45',
-      description: 'Perkenalan produk baru Kixx PAO series. Owner tertarik untuk trial.',
-      orderValue: 'Rp 2.400.000',
-      hasOrder: true,
-      photoUrl: null
-    }
-  ]);
+  const [visits, setVisits] = useState([]);
+  const [customers, setCustomers] = useState([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  const formatDateTime = (val) => {
+    if (!val) return '-';
+    const d = new Date(val);
+    if (isNaN(d.getTime())) return val;
+    const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    return `${dateStr} • ${timeStr}`;
+  };
+
+  const loadCustomers = () => {
+    return customerService.getAll()
+      .then((res) => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.customers || res?.pelanggan || []);
+        setCustomers(data);
+      })
+      .catch((err) => {
+        console.error("Gagal memuat pelanggan dari BE, menggunakan mockDb:", err);
+        setCustomers(getCustomers());
+      });
+  };
+
+  const loadVisits = () => {
+    setIsLoading(true);
+    setErrorMsg('');
+    visitService.getAll()
+      .then((res) => {
+        const data = Array.isArray(res) ? res : (res?.data || res?.visits || []);
+        const mapped = data.map(v => ({
+          id_pelanggan: v.id_pelanggan || null,
+          name: v.bengkelName || v.name || v.bengkel || v.nama_bengkel || '',
+          datetime: formatDateTime(v.date || v.datetime || v.created_at || v.tanggal || v.tgl_kunjungan),
+          description: v.note || v.description || v.keterangan || v.hasil_diskusi || v.catatan || '',
+          orderValue: v.orderValue || v.nilai_order || v.order_value || null,
+          hasOrder: !!(v.hasOrder || v.has_order || v.nilai_order || v.orderValue),
+          photoUrl: v.image || v.photoUrl || v.foto || v.photo || v.foto_visit || null
+        }));
+        setVisits(mapped);
+        setIsLoading(false);
+      })
+      .catch((err) => {
+        console.error("Gagal memuat kunjungan:", err);
+        setErrorMsg("Gagal memuat data kunjungan dari backend.");
+        setIsLoading(false);
+      });
+  };
+
+  useEffect(() => {
+    loadCustomers().finally(() => {
+      loadVisits();
+    });
+  }, []);
+
+  const mappedVisits = useMemo(() => {
+    return visits.map(v => {
+      const matchedCust = customers.find(c => String(c.id_pelanggan || c.id) === String(v.id_pelanggan));
+      const customerName = matchedCust ? (matchedCust.nama || matchedCust.name) : (v.name || v.bengkel || v.nama_bengkel || 'Bengkel');
+      return {
+        ...v,
+        resolvedName: customerName
+      };
+    });
+  }, [visits, customers]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newVisit, setNewVisit] = useState({
+    id_pelanggan: '',
     name: '',
     description: '',
     hasOrder: false,
@@ -50,6 +87,8 @@ export default function LaporanKunjungan() {
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
+      // NOTE: Di aplikasi riil, file ini biasanya di-upload ke server cloud atau dikirim sebagai multipart/form-data.
+      // Kita simpan object URL sebagai fallback untuk preview lokal.
       const url = URL.createObjectURL(file);
       setNewVisit({ ...newVisit, photoUrl: url });
     }
@@ -57,21 +96,30 @@ export default function LaporanKunjungan() {
 
   const handleAddVisit = (e) => {
     e.preventDefault();
-    const d = new Date();
-    const dateStr = d.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
-    const timeStr = d.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+    setIsLoading(true);
     
-    setVisits([
-      {
-        ...newVisit,
-        datetime: `${dateStr} • ${timeStr}`,
-        orderValue: newVisit.hasOrder ? `Rp ${newVisit.orderValue}` : null,
-      },
-      ...visits
-    ]);
-    
-    setIsModalOpen(false);
-    setNewVisit({ name: '', description: '', hasOrder: false, orderValue: '', photoUrl: null });
+    const payload = {
+      sales_id: localStorage.getItem('userId') ? Number(localStorage.getItem('userId')) : null,
+      id_pelanggan: newVisit.id_pelanggan || null,
+      catatan: newVisit.description,
+      keterangan: newVisit.description,
+      has_order: newVisit.hasOrder ? 1 : 0,
+      nilai_order: newVisit.hasOrder ? Number(newVisit.orderValue.replace(/[^0-9]/g, '')) : 0,
+      tgl_kunjungan: new Date().toISOString().slice(0, 19).replace('T', ' '),
+      foto_visit: newVisit.photoUrl // fallback preview local
+    };
+
+    visitService.create(payload)
+      .then(() => {
+        loadVisits();
+        setIsModalOpen(false);
+        setNewVisit({ id_pelanggan: '', name: '', description: '', hasOrder: false, orderValue: '', photoUrl: null });
+      })
+      .catch((err) => {
+        console.error("Gagal menyimpan kunjungan:", err);
+        setErrorMsg("Gagal menyimpan data kunjungan.");
+        setIsLoading(false);
+      });
   };
 
   return (
@@ -92,6 +140,12 @@ export default function LaporanKunjungan() {
           </button>
         </div>
 
+        {errorMsg && (
+          <div className="w-full bg-[#FEE2E2] text-[#DC2626] text-sm font-semibold p-4 rounded-lg border border-[#FCA5A5]">
+            {errorMsg}
+          </div>
+        )}
+
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-[#EFF6FF] border border-[#BFDBFE] rounded-xl p-5 flex items-center gap-4">
@@ -99,8 +153,8 @@ export default function LaporanKunjungan() {
               <MapPin className="w-6 h-6" />
             </div>
             <div>
-              <p className="text-xs font-semibold text-[#3B82F6] mb-1">Kunjungan Minggu Ini</p>
-              <h3 className="text-2xl font-bold text-[#1E3A8A]">12</h3>
+              <p className="text-xs font-semibold text-[#3B82F6] mb-1">Total Kunjungan</p>
+              <h3 className="text-2xl font-bold text-[#1E3A8A]">{visits.length}</h3>
             </div>
           </div>
           <div className="bg-[#F0FDF4] border border-[#BBF7D0] rounded-xl p-5 flex items-center gap-4">
@@ -109,7 +163,7 @@ export default function LaporanKunjungan() {
             </div>
             <div>
               <p className="text-xs font-semibold text-[#16A34A] mb-1">Dengan Foto</p>
-              <h3 className="text-2xl font-bold text-[#14532D]">10</h3>
+              <h3 className="text-2xl font-bold text-[#14532D]">{visits.filter(v => v.photoUrl).length}</h3>
             </div>
           </div>
           <div className="bg-[#FAF5FF] border border-[#E9D5FF] rounded-xl p-5 flex items-center gap-4">
@@ -118,7 +172,7 @@ export default function LaporanKunjungan() {
             </div>
             <div>
               <p className="text-xs font-semibold text-[#9333EA] mb-1">Menghasilkan Order</p>
-              <h3 className="text-2xl font-bold text-[#581C87]">8</h3>
+              <h3 className="text-2xl font-bold text-[#581C87]">{visits.filter(v => v.hasOrder).length}</h3>
             </div>
           </div>
         </div>
@@ -129,56 +183,69 @@ export default function LaporanKunjungan() {
             <h3 className="font-bold text-[#1E293B]">Riwayat Kunjungan</h3>
           </div>
           <div className="flex flex-col">
-            {visits.map((visit, index) => (
-              <div key={index} className="flex flex-col sm:flex-row gap-5 p-6 border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors last:border-0">
-                
-                {/* Left: Photo / Placeholder */}
-                <div className="w-full sm:w-[120px] h-[120px] bg-[#E2E8F0] rounded-xl flex flex-col items-center justify-center text-[#94A3B8] shrink-0 border border-[#CBD5E1] overflow-hidden">
-                  {visit.photoUrl ? (
-                    <img src={visit.photoUrl} alt="Foto Kunjungan" className="w-full h-full object-cover" />
-                  ) : (
-                    <Camera className="w-8 h-8 mb-2" />
-                  )}
-                </div>
-
-                {/* Middle: Info */}
-                <div className="flex-1 flex flex-col">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-2">
-                    <div>
-                      <h4 className="font-bold text-lg text-[#1E293B]">{visit.name}</h4>
-                      <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B] mt-1">
-                        <Calendar className="w-3.5 h-3.5" />
-                        {visit.datetime}
-                      </div>
-                    </div>
-                    {/* Tags for Mobile / Desktop Right */}
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#F1F5F9] text-[#64748B] text-[11px] font-bold border border-[#E2E8F0]">
-                        <Camera className="w-3.5 h-3.5" /> Foto
-                      </div>
-                      {visit.hasOrder ? (
-                        <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#DCFCE7] text-[#16A34A] text-[11px] font-bold border border-[#BBF7D0]">
-                          <Check className="w-3.5 h-3.5" /> Ada Order
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#F1F5F9] text-[#64748B] text-[11px] font-bold border border-[#E2E8F0]">
-                          Kunjungan
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <p className="text-sm text-[#475569] mb-4">{visit.description}</p>
-                  
-                  {visit.orderValue && (
-                    <div className="mt-auto self-start flex items-center gap-1.5 bg-[#F0FDF4] border border-[#BBF7D0] px-3 py-1.5 rounded-lg text-xs font-bold text-[#16A34A]">
-                      <DollarSign className="w-3.5 h-3.5" />
-                      Order Value: {visit.orderValue}
-                    </div>
-                  )}
-                </div>
+            {isLoading ? (
+              <div className="flex flex-col items-center justify-center p-12 text-[#64748B] gap-2">
+                <Loader2 className="w-8 h-8 animate-spin text-[#4F46E5]" />
+                <span className="text-sm font-medium">Memuat riwayat kunjungan...</span>
               </div>
-            ))}
+            ) : visits.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-12 text-[#64748B]">
+                <span className="text-sm font-medium">Belum ada riwayat kunjungan dicatat.</span>
+              </div>
+            ) : (
+              mappedVisits.map((visit, index) => (
+                <div key={index} className="flex flex-col sm:flex-row gap-5 p-6 border-b border-[#E2E8F0] hover:bg-[#F8FAFC] transition-colors last:border-0">
+                  
+                  {/* Left: Photo / Placeholder */}
+                  <div className="w-full sm:w-[120px] h-[120px] bg-[#E2E8F0] rounded-xl flex flex-col items-center justify-center text-[#94A3B8] shrink-0 border border-[#CBD5E1] overflow-hidden">
+                    {visit.photoUrl ? (
+                      <img src={visit.photoUrl} alt="Foto Kunjungan" className="w-full h-full object-cover" />
+                    ) : (
+                      <Camera className="w-8 h-8 mb-2" />
+                    )}
+                  </div>
+
+                  {/* Middle: Info */}
+                  <div className="flex-1 flex flex-col">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4 mb-2">
+                      <div>
+                        <h4 className="font-bold text-lg text-[#1E293B]">{visit.resolvedName || visit.name}</h4>
+                        <div className="flex items-center gap-1.5 text-xs font-medium text-[#64748B] mt-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {visit.datetime}
+                        </div>
+                      </div>
+                      {/* Tags for Mobile / Desktop Right */}
+                      <div className="flex items-center gap-2 shrink-0">
+                        {visit.photoUrl && (
+                          <div className="flex items-center gap-1.5 px-2.5 py-1 rounded bg-[#F1F5F9] text-[#64748B] text-[11px] font-bold border border-[#E2E8F0]">
+                            <Camera className="w-3.5 h-3.5" /> Foto
+                          </div>
+                        )}
+                        {visit.hasOrder ? (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#DCFCE7] text-[#16A34A] text-[11px] font-bold border border-[#BBF7D0]">
+                            <Check className="w-3.5 h-3.5" /> Ada Order
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#F1F5F9] text-[#64748B] text-[11px] font-bold border border-[#E2E8F0]">
+                            Kunjungan
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    <p className="text-sm text-[#475569] mb-4">{visit.description}</p>
+                    
+                    {visit.orderValue ? (
+                      <div className="mt-auto self-start flex items-center gap-1.5 bg-[#F0FDF4] border border-[#BBF7D0] px-3 py-1.5 rounded-lg text-xs font-bold text-[#16A34A]">
+                        <DollarSign className="w-3.5 h-3.5" />
+                        Order Value: {typeof visit.orderValue === 'number' ? `Rp ${visit.orderValue.toLocaleString('id-ID')}` : visit.orderValue}
+                      </div>
+                    ) : null}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
 
@@ -200,14 +267,23 @@ export default function LaporanKunjungan() {
                 
                 <div>
                   <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Bengkel <span className="text-[#EF4444]">*</span></label>
-                  <input 
-                    type="text" 
+                  <select 
                     required
-                    value={newVisit.name}
-                    onChange={(e) => setNewVisit({...newVisit, name: e.target.value})}
-                    placeholder="Contoh: Maju Jaya Motor"
-                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
-                  />
+                    value={newVisit.id_pelanggan}
+                    onChange={(e) => setNewVisit({...newVisit, id_pelanggan: e.target.value})}
+                    className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] bg-white text-[#1E293B]"
+                  >
+                    <option value="">-- Pilih Bengkel / Pelanggan --</option>
+                    {customers.map((c) => {
+                      const idVal = c.id_pelanggan || c.id;
+                      const nameVal = c.nama || c.name;
+                      return (
+                        <option key={idVal} value={idVal}>
+                          {nameVal} ({c.city || c.alamat || c.kota || 'Banjarmasin'})
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
 
                 <div>
@@ -269,7 +345,11 @@ export default function LaporanKunjungan() {
                         type="text" 
                         required={newVisit.hasOrder}
                         value={newVisit.orderValue}
-                        onChange={(e) => setNewVisit({...newVisit, orderValue: e.target.value})}
+                        onChange={(e) => {
+                          const rawVal = e.target.value.replace(/[^0-9]/g, '');
+                          const formattedVal = rawVal ? Number(rawVal).toLocaleString('id-ID') : '';
+                          setNewVisit({...newVisit, orderValue: formattedVal});
+                        }}
                         placeholder="5.000.000"
                         className="w-full border border-[#E2E8F0] rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                       />
