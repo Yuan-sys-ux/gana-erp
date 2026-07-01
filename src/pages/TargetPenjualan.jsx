@@ -246,8 +246,8 @@ export default function TargetPenjualan() {
           </div>
           
           <div className="flex flex-wrap items-center gap-3">
-            {/* Sales Selector for Admin/Owner */}
-            {(role === 'admin' || role === 'owner') && salesList.length > 0 && (
+            {/* Sales Selector for Admin Only */}
+            {role === 'admin' && salesList.length > 0 && (
               <div className="flex flex-col gap-1">
                 <select 
                   value={selectedSalesId} 
