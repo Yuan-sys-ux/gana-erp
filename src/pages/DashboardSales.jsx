@@ -240,7 +240,7 @@ export default function DashboardSales() {
         </div>
 
         {/* Action Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
           <Link to="/input-pesanan" className="bg-[#22C55E] text-white p-6 rounded-xl shadow-sm hover:bg-[#16A34A] transition-colors flex flex-col justify-center">
              <ShoppingCart className="w-6 h-6 mb-3 opacity-90" />
              <h3 className="font-bold text-lg mb-1">Pesanan Cepat</h3>
@@ -250,11 +250,6 @@ export default function DashboardSales() {
              <MapPin className="w-6 h-6 mb-3 opacity-90" />
              <h3 className="font-bold text-lg mb-1">Catatan Kunjungan</h3>
              <p className="text-sm opacity-90">Catat kunjungan + foto</p>
-          </Link>
-          <Link to="/target-penjualan" className="bg-[#3B82F6] text-white p-6 rounded-xl shadow-sm hover:bg-[#2563EB] transition-colors flex flex-col justify-center">
-             <Target className="w-6 h-6 mb-3 opacity-90" />
-             <h3 className="font-bold text-lg mb-1">Pantau Target</h3>
-             <p className="text-sm opacity-90">Pantau pencapaian</p>
           </Link>
         </div>
 

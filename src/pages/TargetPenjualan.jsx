@@ -273,8 +273,8 @@ export default function TargetPenjualan() {
               />
             </div>
 
-            {/* Configure Button for Admin / Owner */}
-            {(role === 'admin' || role === 'owner') && (
+            {/* Configure Button for Admin Only */}
+            {role === 'admin' && (
               <button 
                 onClick={handleOpenConfigureModal}
                 className="flex items-center justify-center gap-2 px-4 py-2 bg-[#4F46E5] text-white rounded-lg font-semibold text-sm hover:bg-[#4338CA] transition-colors"
@@ -312,7 +312,7 @@ export default function TargetPenjualan() {
             <p className="text-sm text-[#64748B] mt-1 max-w-md mx-auto">
               Target penjualan untuk {role === 'sales' ? 'Anda' : `mitra ${currentSalesName}`} di bulan {formatMonthName(selectedMonth)} belum dikonfigurasi.
             </p>
-            {(role === 'admin' || role === 'owner') && (
+            {role === 'admin' && (
               <button 
                 onClick={handleOpenConfigureModal}
                 className="mt-6 px-5 py-2.5 bg-[#4F46E5] hover:bg-[#4338CA] text-white font-bold text-sm rounded-lg transition-colors inline-flex items-center gap-2 shadow-sm"
