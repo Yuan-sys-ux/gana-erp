@@ -84,6 +84,7 @@ export default function Sidebar({ isOpen, setIsOpen }) {
         { name: 'Input Pesanan', icon: <ShoppingCart className="w-[18px] h-[18px]" />, path: '/input-pesanan' },
         { name: 'Laporan Kunjungan', icon: <MapPin className="w-[18px] h-[18px]" />, path: '/laporan-kunjungan' },
         { name: 'Monitoring Piutang', icon: <DollarSign className="w-[18px] h-[18px]" />, path: '/monitoring-piutang' },
+        { name: 'Target Penjualan', icon: <TrendingUp className="w-[18px] h-[18px]" />, path: '/target-penjualan' },
       ]
     }
   ];

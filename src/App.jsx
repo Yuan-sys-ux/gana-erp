@@ -144,7 +144,7 @@ function App() {
         <Route 
           path="/target-penjualan" 
           element={
-            <ProtectedRoute allowedRoles={['admin', 'owner']}>
+            <ProtectedRoute allowedRoles={['admin', 'owner', 'sales']}>
               <TargetPenjualan />
             </ProtectedRoute>
           } 

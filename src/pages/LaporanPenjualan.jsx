@@ -5,8 +5,8 @@ import api from '../utils/api';
 
 export default function LaporanPenjualan() {
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState('06');
-  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
 
   const [reportData, setReportData] = useState({
     totalRevenue: 0,
@@ -60,7 +60,9 @@ export default function LaporanPenjualan() {
   }, [selectedMonth, selectedYear]);
 
   // Is future check
-  const isFuture = `${selectedYear}-${selectedMonth}` > '2026-06';
+  const today = new Date();
+  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+  const isFuture = `${selectedYear}-${selectedMonth}` > currentMonthStr;
 
   return (
     <DashboardLayout>

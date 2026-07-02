@@ -201,10 +201,11 @@ export default function InputStokMasuk() {
       })
       .catch(err => {
         console.error("Gagal menyimpan ke database:", err);
+        const detailedError = err.response?.data?.message || err.message || "Gagal mengirim penerimaan barang ke database backend.";
         showAlert(
           'error',
           'Gagal!',
-          'Gagal mengirim penerimaan barang ke database backend.'
+          `Gagal menyimpan: ${detailedError}`
         );
       });
   };

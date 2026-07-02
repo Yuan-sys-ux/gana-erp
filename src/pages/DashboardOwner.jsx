@@ -1,15 +1,37 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
-import { DollarSign, AlertTriangle, TrendingUp, Calendar, Loader2 } from 'lucide-react';
+import { DollarSign, AlertTriangle, TrendingUp, Calendar, Loader2, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardOwner() {
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedMonth, setSelectedMonth] = useState('06');
-  const [selectedYear, setSelectedYear] = useState('2026');
+  const [selectedMonth, setSelectedMonth] = useState(() => String(new Date().getMonth() + 1).padStart(2, '0'));
+  const [selectedYear, setSelectedYear] = useState(() => String(new Date().getFullYear()));
+
+  const handlePrevMonth = () => {
+    let m = parseInt(selectedMonth, 10) - 1;
+    let y = parseInt(selectedYear, 10);
+    if (m < 1) {
+      m = 12;
+      y = y - 1;
+    }
+    setSelectedMonth(String(m).padStart(2, '0'));
+    setSelectedYear(String(y));
+  };
+
+  const handleNextMonth = () => {
+    let m = parseInt(selectedMonth, 10) + 1;
+    let y = parseInt(selectedYear, 10);
+    if (m > 12) {
+      m = 1;
+      y = y + 1;
+    }
+    setSelectedMonth(String(m).padStart(2, '0'));
+    setSelectedYear(String(y));
+  };
 
   const [dashboardData, setDashboardData] = useState({
     stats: {
@@ -161,7 +183,26 @@ export default function DashboardOwner() {
               
               {/* Chart Section */}
               <div className="lg:col-span-2 bg-white rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] p-5 flex flex-col">
-                <h3 className="font-bold text-[#1E293B] mb-6">Penjualan vs Pembelian Bulan Ini (MTD)</h3>
+                <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
+                  <h3 className="font-bold text-[#1E293B]">Penjualan vs Pembelian (4 Bulan Terakhir)</h3>
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={handlePrevMonth}
+                      className="p-1 border border-[#E2E8F0] rounded hover:bg-slate-50 transition-colors text-[#64748B] hover:text-[#1E293B] flex items-center justify-center"
+                      title="Geser ke kiri (Bulan sebelumnya)"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                    </button>
+                    <span className="text-[11px] font-bold text-[#64748B] px-1">Geser Bulan</span>
+                    <button 
+                      onClick={handleNextMonth}
+                      className="p-1 border border-[#E2E8F0] rounded hover:bg-slate-50 transition-colors text-[#64748B] hover:text-[#1E293B] flex items-center justify-center"
+                      title="Geser ke kanan (Bulan berikutnya)"
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
                 
                 <div className="flex-1 min-h-[300px]">
                   {dashboardData.chartData.length > 0 ? (
