@@ -116,7 +116,8 @@ export default function LaporanKunjungan() {
       })
       .catch((err) => {
         console.error("Gagal menyimpan kunjungan:", err);
-        setModalErrorMsg("Gagal menyimpan data kunjungan ke backend. Silakan coba lagi.");
+        const detailedError = err.response?.data?.message || err.message || "Silakan coba lagi.";
+        setModalErrorMsg(`Gagal menyimpan kunjungan: ${detailedError}`);
         setIsLoading(false);
       });
   };
