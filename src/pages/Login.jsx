@@ -29,18 +29,6 @@ export default function Login() {
 
     const userRole = getRoleFromUsername(username);
 
-    // Daftar kredensial dummy/demo untuk fallback login lokal
-    const dummyUsers = {
-      admin: { password: 'admin123', role: 'admin', name: 'Admin Demo' },
-      kepala: { password: 'gudang123', role: 'kepala_gudang', name: 'Kepala Gudang Demo' },
-      staff: { password: 'staff123', role: 'staff_gudang', name: 'Staff Gudang Demo' },
-      owner: { password: 'owner123', role: 'owner', name: 'Owner Demo' },
-      sales: { password: 'sales123', role: 'sales', name: 'Sales Demo' }
-    };
-
-    const normalizedUsername = username.toLowerCase();
-    const isDummy = dummyUsers[normalizedUsername] && dummyUsers[normalizedUsername].password === password;
-
     // Kirim request login ke backend ngrok sesuai endpoint /api/auth/login
     api.post('/api/auth/login', { 
       username, 
@@ -70,22 +58,9 @@ export default function Login() {
         navigate('/dashboard');
       })
       .catch((err) => {
-        // Fallback ke login lokal jika backend offline/gagal tetapi menggunakan kredensial dummy yang valid
-        if (isDummy) {
-          const dummyInfo = dummyUsers[normalizedUsername];
-          localStorage.setItem('userRole', dummyInfo.role);
-          localStorage.setItem('userFullName', dummyInfo.name);
-          localStorage.setItem('userToken', 'dummy-local-token-' + dummyInfo.role);
-          localStorage.setItem('userId', 'dummy-sales-id');
-
-          setIsLoading(false);
-          navigate('/dashboard');
-          return;
-        }
-
         setIsLoading(false);
         // Menampilkan pesan error dari backend jika ada, atau default error
-        const errorMessage = err.response?.data?.message || 'Username atau password salah!';
+        const errorMessage = err.response?.data?.message || 'Gagal terhubung ke server atau username/password salah!';
         setErrorMsg(errorMessage);
       });
   };

@@ -3,13 +3,13 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import { MapPin, Image as ImageIcon, Calendar, Plus, Camera, Check, DollarSign, X, Upload, Loader2 } from 'lucide-react';
 import { visitService } from '../services/visitService';
 import { customerService } from '../services/customerService';
-import { getCustomers } from '../utils/mockDb';
 
 export default function LaporanKunjungan() {
   const [visits, setVisits] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
+  const [modalErrorMsg, setModalErrorMsg] = useState('');
 
   const formatDateTime = (val) => {
     if (!val) return '-';
@@ -27,14 +27,13 @@ export default function LaporanKunjungan() {
         setCustomers(data);
       })
       .catch((err) => {
-        console.error("Gagal memuat pelanggan dari BE, menggunakan mockDb:", err);
-        setCustomers(getCustomers());
+        console.error("Gagal memuat pelanggan dari BE:", err);
+        setCustomers([]);
       });
   };
 
   const loadVisits = () => {
     setIsLoading(true);
-    setErrorMsg('');
     visitService.getAll()
       .then((res) => {
         const data = Array.isArray(res) ? res : (res?.data || res?.visits || []);
@@ -52,7 +51,6 @@ export default function LaporanKunjungan() {
       })
       .catch((err) => {
         console.error("Gagal memuat kunjungan:", err);
-        setErrorMsg("Gagal memuat data kunjungan dari backend.");
         setIsLoading(false);
       });
   };
@@ -87,8 +85,6 @@ export default function LaporanKunjungan() {
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
     if (file) {
-      // NOTE: Di aplikasi riil, file ini biasanya di-upload ke server cloud atau dikirim sebagai multipart/form-data.
-      // Kita simpan object URL sebagai fallback untuk preview lokal.
       const url = URL.createObjectURL(file);
       setNewVisit({ ...newVisit, photoUrl: url });
     }
@@ -97,10 +93,12 @@ export default function LaporanKunjungan() {
   const handleAddVisit = (e) => {
     e.preventDefault();
     setIsLoading(true);
+    setModalErrorMsg('');
     
     const payload = {
       sales_id: localStorage.getItem('userId') ? Number(localStorage.getItem('userId')) : null,
       id_pelanggan: newVisit.id_pelanggan || null,
+      pelanggan_id: newVisit.id_pelanggan || null,
       catatan: newVisit.description,
       keterangan: newVisit.description,
       has_order: newVisit.hasOrder ? 1 : 0,
@@ -114,10 +112,11 @@ export default function LaporanKunjungan() {
         loadVisits();
         setIsModalOpen(false);
         setNewVisit({ id_pelanggan: '', name: '', description: '', hasOrder: false, orderValue: '', photoUrl: null });
+        setModalErrorMsg('');
       })
       .catch((err) => {
         console.error("Gagal menyimpan kunjungan:", err);
-        setErrorMsg("Gagal menyimpan data kunjungan.");
+        setModalErrorMsg("Gagal menyimpan data kunjungan ke backend. Silakan coba lagi.");
         setIsLoading(false);
       });
   };
@@ -133,7 +132,7 @@ export default function LaporanKunjungan() {
             <p className="text-sm text-[#64748B] mt-1">Sales Activity Log dengan foto kunjungan</p>
           </div>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => { setModalErrorMsg(''); setIsModalOpen(true); }}
             className="flex items-center justify-center gap-2 px-4 py-2 bg-[#4F46E5] text-white rounded-lg font-semibold text-sm hover:bg-[#4338CA] transition-colors w-full sm:w-auto"
           >
             <Plus className="w-4 h-4" /> Catat Kunjungan
@@ -257,7 +256,7 @@ export default function LaporanKunjungan() {
           <div className="bg-white rounded-xl shadow-xl w-full max-w-lg overflow-hidden flex flex-col max-h-[90vh]">
             <div className="flex items-center justify-between p-5 border-b border-[#E2E8F0] shrink-0">
               <h3 className="font-bold text-[#1E293B]">Catat Kunjungan Baru</h3>
-              <button onClick={() => setIsModalOpen(false)} className="text-[#64748B] hover:text-[#1E293B]">
+              <button onClick={() => { setModalErrorMsg(''); setIsModalOpen(false); }} className="text-[#64748B] hover:text-[#1E293B]">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -265,6 +264,12 @@ export default function LaporanKunjungan() {
             <div className="p-5 overflow-y-auto flex-1">
               <form id="kunjungan-form" onSubmit={handleAddVisit} className="flex flex-col gap-4">
                 
+                {modalErrorMsg && (
+                  <div className="w-full bg-[#FEE2E2] text-[#DC2626] text-xs font-semibold p-3 rounded-lg border border-[#FCA5A5] shrink-0">
+                    {modalErrorMsg}
+                  </div>
+                )}
+
                 <div>
                   <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Bengkel <span className="text-[#EF4444]">*</span></label>
                   <select 
@@ -363,7 +368,7 @@ export default function LaporanKunjungan() {
             <div className="p-5 border-t border-[#E2E8F0] flex justify-end gap-3 shrink-0">
               <button 
                 type="button" 
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => { setModalErrorMsg(''); setIsModalOpen(false); }}
                 className="px-4 py-2 bg-white border border-[#CBD5E1] text-[#64748B] rounded-lg font-bold text-sm hover:bg-[#F8FAFC]"
               >
                 Batal

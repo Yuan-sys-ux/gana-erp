@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import * as XLSX from 'xlsx';
 import { Search, FileText, CheckCircle2, Clock, XCircle, ChevronDown, Download, Eye, Check, X, AlertCircle } from 'lucide-react';
-import { getOrders, updateOrderStatus } from '../utils/mockDb';
 import { orderService } from '../services/orderService';
 
 export default function DaftarPenjualan() {
@@ -27,8 +26,8 @@ export default function DaftarPenjualan() {
         setSalesOrders(mapped);
       })
       .catch(err => {
-        console.error("Gagal load orders dari API, load lokal:", err);
-        setSalesOrders(getOrders());
+        console.error("Gagal load orders dari API:", err);
+        setSalesOrders([]);
       });
   };
 
@@ -57,20 +56,14 @@ export default function DaftarPenjualan() {
 
   const handleApprove = () => {
     if (approveModal.orderId) {
-      // Determine if numeric ID (DB) or string ID (mockDb)
-      const isMockId = isNaN(Number(approveModal.orderId));
-      const apiUpdate = isMockId
-        ? Promise.reject("Mock ID")
-        : orderService.update(approveModal.orderId, { status: 'Approved' });
-
-      apiUpdate
+      orderService.update(approveModal.orderId, { status: 'Approved' })
         .then(() => {
           loadOrders();
           setApproveModal({ isOpen: false, orderId: null });
         })
-        .catch(() => {
-          updateOrderStatus(approveModal.orderId, 'Approved');
-          loadOrders();
+        .catch((err) => {
+          console.error("Gagal menyetujui pesanan:", err);
+          alert("Gagal menyetujui pesanan di database.");
           setApproveModal({ isOpen: false, orderId: null });
         });
     }

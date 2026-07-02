@@ -1,15 +1,12 @@
 import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, ShoppingCart, Plus, Minus, Trash2, X, AlertCircle, CheckCircle2 } from 'lucide-react';
-import { getCustomers, addCustomer, addOrder } from '../utils/mockDb';
 import { customerService } from '../services/customerService';
 import { productService } from '../services/productService';
 import { orderService } from '../services/orderService';
 
 export default function InputPesanan() {
-  const allProducts = [
-    { id: 1, brand: 'Kixx', name: '[DUMMY] Kixx G1 5W-30', variant: '5W-30', size: '4L', price: 400000, priceFormatted: 'Rp 400.000', stock: 120, headerColor: 'bg-[#EF4444]' },
-  ];
+  const allProducts = [];
 
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState('Semua');
@@ -26,45 +23,34 @@ export default function InputPesanan() {
     customerService.getAll()
       .then(res => {
         if (res && res.success === false) {
-          console.warn("API pelanggan mengembalikan status gagal, menggunakan fallback pelanggan lokal:", res.message);
-          const localCustomers = getCustomers();
-          setCustomersList(localCustomers);
-          setBengkels(localCustomers.map(c => c.name));
+          console.warn("API pelanggan mengembalikan status gagal:", res.message);
+          setCustomersList([]);
+          setBengkels([]);
           return;
         }
 
         const data = Array.isArray(res) ? res : (res?.data || res?.customers || []);
-        if (data.length === 0) {
-          const localCustomers = getCustomers();
-          setCustomersList(localCustomers);
-          setBengkels(localCustomers.map(c => c.name));
-          return;
-        }
-
         setCustomersList(data);
         setBengkels(data.map(c => c.name || c.nama));
       })
       .catch(err => {
         console.error("Gagal load pelanggan dari API:", err);
-        // Fallback to local
-        const localCustomers = getCustomers();
-        setCustomersList(localCustomers);
-        setBengkels(localCustomers.map(c => c.name));
+        setCustomersList([]);
+        setBengkels([]);
       });
 
     // Load products
     productService.getAll()
       .then(res => {
         if (res && res.success === false) {
-          console.warn("API produk mengembalikan status gagal, menggunakan fallback produk lokal:", res.message);
-          setProducts(allProducts);
+          console.warn("API produk mengembalikan status gagal:", res.message);
+          setProducts([]);
           return;
         }
 
         const data = Array.isArray(res) ? res : (res?.data || res?.products || []);
         if (data.length === 0) {
-          console.warn("Daftar produk API kosong, menggunakan fallback produk lokal");
-          setProducts(allProducts);
+          setProducts([]);
           return;
         }
 
@@ -85,8 +71,8 @@ export default function InputPesanan() {
         setProducts(mapped);
       })
       .catch(err => {
-        console.error("Gagal load produk dari API, menggunakan fallback produk lokal:", err);
-        setProducts(allProducts);
+        console.error("Gagal load produk dari API:", err);
+        setProducts([]);
       });
   }, []);
   const [isAddBengkelOpen, setIsAddBengkelOpen] = useState(false);
@@ -136,23 +122,8 @@ export default function InputPesanan() {
           showAlert('success', 'Pelanggan Ditambahkan', `Bengkel ${name} berhasil ditambahkan ke database.`);
         })
         .catch(err => {
-          console.error("Gagal menambahkan pelanggan ke API, memakai lokal:", err);
-          const newCustomer = {
-            id: `PLG-NEW-${Date.now()}`,
-            name: newCustomerForm.name,
-            address: newCustomerForm.address || '-',
-            phone: newCustomerForm.phone || '-',
-            outstanding: 0,
-            lastOrder: '-',
-            status: 'Active',
-            city: newCustomerForm.city || 'Banjarmasin'
-          };
-          addCustomer(newCustomer);
-          setCustomersList(prev => [...prev, newCustomer]);
-          setBengkels([...bengkels, newCustomerForm.name]);
-          setSelectedBengkel(newCustomerForm.name);
-          setNewCustomerForm({ name: '', address: '', phone: '', city: 'Banjarmasin' });
-          setIsAddBengkelOpen(false);
+          console.error("Gagal menambahkan pelanggan ke API:", err);
+          showAlert('error', 'Gagal', 'Gagal menambahkan pelanggan ke database backend.');
         });
     }
   };
@@ -202,10 +173,7 @@ export default function InputPesanan() {
       return;
     }
     
-    let paymentInfo = paymentMethod === 'cash' ? 'Tunai' : `Tempo (${tempoDays} Hari)`;
-    const totalQty = cart.reduce((acc, item) => acc + item.qty, 0);
     const customerObj = customersList.find(c => (c.name || c.nama) === selectedBengkel);
-    const customerAddress = customerObj ? (customerObj.address || customerObj.alamat) : '-';
     const customerId = customerObj ? customerObj.id : null;
 
     // Build payload for backend API
@@ -229,29 +197,8 @@ export default function InputPesanan() {
         setPaymentMethod('cash');
       })
       .catch(err => {
-        console.error("Gagal mengirim pesanan ke API, menyimpan ke lokal:", err);
-        // Fallback to local mockDb
-        const newOrder = {
-          customer: selectedBengkel,
-          sales: 'Sales System',
-          total: cartTotal,
-          status: 'Draft',
-          qty: totalQty,
-          address: customerAddress,
-          paymentMethod: paymentMethod,
-          items: cart.map(item => ({
-            id: item.id,
-            name: item.name || item.nama,
-            brand: item.brand,
-            qty: item.qty,
-            price: item.price
-          }))
-        };
-        addOrder(newOrder);
-        showAlert('success', 'Pesanan Disimpan Lokal!', `Gagal menghubungi API backend. Pesanan berhasil disimpan secara lokal untuk ${selectedBengkel} senilai Rp ${cartTotal.toLocaleString('id-ID')}.`);
-        setCart([]);
-        setSelectedBengkel('');
-        setPaymentMethod('cash');
+        console.error("Gagal mengirim pesanan ke API:", err);
+        showAlert('error', 'Gagal!', 'Gagal mengirimkan pesanan ke server backend. Pastikan koneksi aktif.');
       });
   };
 

@@ -2,7 +2,6 @@ import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, AlertTriangle, CheckCircle2, Clock, Mail, Phone, DollarSign, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
-import { getOrders, confirmOrderPaymentLocal, getCustomers, saveCustomers, saveOrders } from '../utils/mockDb';
 
 export default function MonitoringPiutang() {
   const [role, setRole] = useState('');
@@ -35,66 +34,6 @@ export default function MonitoringPiutang() {
     list: []
   });
   
-  const loadLocalPiutang = () => {
-    const orders = getOrders();
-    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
-    const parseDueDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return new Date();
-      const day = parseInt(parts[0]);
-      const monthName = parts[1];
-      const year = parseInt(parts[2]);
-      const monthIdx = monthsId.indexOf(monthName);
-      return new Date(year, monthIdx, day);
-    };
-
-    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
-    const now = new Date(2026, 5, 12); // 12 June 2026
-
-    const list = unpaidOrders.map(o => {
-      const dueDateObj = parseDueDate(o.dueDate);
-      const diffTime = dueDateObj.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      let status = 'safe';
-      let days = diffDays;
-
-      if (diffDays < 0) {
-        status = 'overdue';
-        days = Math.abs(diffDays);
-      } else if (diffDays <= 7) {
-        status = 'warning';
-        days = diffDays;
-      } else {
-        status = 'safe';
-        days = diffDays;
-      }
-
-      return {
-        id: o.id_transaksi || o.invoiceId || `INV-${o.id}`,
-        dbId: o.id,
-        customer: o.customer,
-        city: o.address ? o.address.split(',').pop().trim() : 'Banjarmasin',
-        amount: Number(o.total || 0),
-        dueDate: o.dueDate,
-        status,
-        days
-      };
-    });
-
-    const totalPiutang = list.reduce((sum, item) => sum + item.amount, 0);
-    const overduePiutang = list.filter(item => item.status === 'overdue').reduce((sum, item) => sum + item.amount, 0);
-    const countOverdue = list.filter(item => item.status === 'overdue').length;
-    const warningPiutang = list.filter(item => item.status === 'warning').reduce((sum, item) => sum + item.amount, 0);
-
-    return {
-      stats: { totalPiutang, overduePiutang, countOverdue, warningPiutang },
-      list
-    };
-  };
-
   const fetchPiutang = () => {
     setIsLoading(true);
     api.get('/api/owner/monitoring-piutang')
@@ -108,9 +47,16 @@ export default function MonitoringPiutang() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat monitoring piutang dari API, gunakan fallback lokal:", err);
-        const localData = loadLocalPiutang();
-        setPiutangData(localData);
+        console.error("Gagal memuat monitoring piutang dari API:", err);
+        setPiutangData({
+          stats: {
+            totalPiutang: 0,
+            overduePiutang: 0,
+            countOverdue: 0,
+            warningPiutang: 0
+          },
+          list: []
+        });
         setIsLoading(false);
       });
   };
@@ -185,35 +131,8 @@ export default function MonitoringPiutang() {
         setConfirmingItem(null);
       })
       .catch(err => {
-        console.error("Gagal update status bayar di API, update lokal:", err);
-        // Fallback to local mockDb
-        try {
-          confirmOrderPaymentLocal(id);
-          showAlert('success', 'Pembayaran Lunas (Lokal)!', `Gagal terhubung ke server, namun status bayar invoice ${confirmingItem.id} berhasil dikonfirmasi lunas secara lokal.`);
-        } catch (localErr) {
-          console.error("Gagal update status bayar lokal:", localErr);
-          // Manually do it if function fails
-          const orders = getOrders();
-          const updatedOrders = orders.map(o => {
-            if (o.id === id || o.invoiceId === id || o.id_transaksi === id) {
-              return { ...o, statusBayar: 'Lunas' };
-            }
-            return o;
-          });
-          saveOrders(updatedOrders);
-
-          const order = orders.find(o => o.id === id || o.invoiceId === id || o.id_transaksi === id);
-          if (order) {
-            const customers = getCustomers();
-            const customerIndex = customers.findIndex(c => c.name === order.customer);
-            if (customerIndex !== -1) {
-              customers[customerIndex].outstanding = Math.max(0, customers[customerIndex].outstanding - order.total);
-              saveCustomers(customers);
-            }
-          }
-          showAlert('success', 'Pembayaran Lunas (Lokal)!', `Gagal terhubung ke server, namun status bayar invoice ${confirmingItem.id} berhasil dikonfirmasi lunas secara lokal (manual).`);
-        }
-        fetchPiutang();
+        console.error("Gagal update status bayar di API:", err);
+        showAlert('error', 'Gagal!', 'Gagal mengonfirmasi status bayar ke backend server.');
         setConfirmingItem(null);
       });
   };

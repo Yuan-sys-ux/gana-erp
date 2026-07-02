@@ -1,7 +1,6 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus, X, AlertCircle, Printer } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
-import { getOrders, updateOrderStatus } from '../utils/mockDb';
 import { useLocation } from 'react-router-dom';
 import { orderService } from '../services/orderService';
 import { productService } from '../services/productService';
@@ -55,12 +54,11 @@ export default function PengirimanBarang() {
         });
       })
       .catch(err => {
-        console.error("Gagal load deliveries dari API, load lokal:", err);
-        const orders = getOrders();
+        console.error("Gagal load deliveries dari API:", err);
         setDeliveries({
-          diproses: orders.filter(o => o.status === 'Approved'),
-          dikirim: orders.filter(o => o.status === 'Shipped'),
-          terkirim: orders.filter(o => o.status === 'Delivered' || o.status === 'Invoiced')
+          diproses: [],
+          dikirim: [],
+          terkirim: []
         });
       });
   };
@@ -202,15 +200,9 @@ export default function PengirimanBarang() {
         );
         handleCloseModal();
       })
-      .catch(() => {
-        updateOrderStatus(selectedOrderId, 'Shipped', { driver: fullDriverInfo });
-        loadDeliveries();
-        showAlert(
-          'success',
-          'Surat Jalan Dibuat!',
-          `Surat Jalan untuk Pesanan ${selectedOrderId} berhasil dibuat. Armada pengiriman dialokasikan ke ${fullDriverInfo}.`
-        );
-        handleCloseModal();
+      .catch((err) => {
+        console.error("Gagal membuat surat jalan di server:", err);
+        showAlert('error', 'Gagal', 'Gagal memproses Surat Jalan di server backend.');
       });
   };
 
@@ -235,14 +227,9 @@ export default function PengirimanBarang() {
           `Pesanan ${id} telah berhasil diterima oleh pelanggan pada pukul ${timeStr}.`
         );
       })
-      .catch(() => {
-        updateOrderStatus(id, 'Delivered', { time: timeStr });
-        loadDeliveries();
-        showAlert(
-          'success',
-          'Pengiriman Selesai!',
-          `Pesanan ${id} telah berhasil diterima oleh pelanggan pada pukul ${timeStr}.`
-        );
+      .catch((err) => {
+        console.error("Gagal menyelesaikan pengiriman di server:", err);
+        showAlert('error', 'Gagal', 'Gagal menyelesaikan pengiriman di server backend.');
       });
   };
 

@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { BarChart2, Trophy, DollarSign, Calendar, Loader2, Package } from 'lucide-react';
 import api from '../utils/api';
-import { getOrders, getProducts } from '../utils/mockDb';
 
 export default function LaporanPenjualan() {
   const [isLoading, setIsLoading] = useState(true);
@@ -34,83 +33,6 @@ export default function LaporanPenjualan() {
 
   const years = ['2024', '2025', '2026', '2027'];
 
-  const loadLocalLaporan = (targetMonth) => {
-    const orders = getOrders();
-    const products = getProducts();
-    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-    
-    const parseToMonthKey = (dateStr) => {
-      if (!dateStr) return '';
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return '';
-      const monthName = parts[1];
-      const year = parts[2];
-      const monthIdx = monthsId.indexOf(monthName);
-      if (monthIdx === -1) return '';
-      const monthStr = String(monthIdx + 1).padStart(2, '0');
-      return `${year}-${monthStr}`;
-    };
-
-    if (targetMonth > '2026-06') {
-      return {
-        totalRevenue: 0,
-        totalDus: 0,
-        avgOrder: 0,
-        topCustomers: [],
-        brandBreakdown: []
-      };
-    }
-
-    const monthlyOrders = orders.filter(o => parseToMonthKey(o.date) === targetMonth);
-
-    const totalRevenue = monthlyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const totalDus = monthlyOrders.reduce((sum, o) => sum + Number(o.qty || 0), 0);
-    const avgOrder = monthlyOrders.length > 0 ? totalRevenue / monthlyOrders.length : 0;
-
-    const customerMap = {};
-    monthlyOrders.forEach(o => {
-      customerMap[o.customer] = (customerMap[o.customer] || 0) + Number(o.total || 0);
-    });
-    
-    const topCustomers = Object.keys(customerMap).map(name => {
-      const orderSample = monthlyOrders.find(o => o.customer === name);
-      return {
-        name,
-        city: orderSample?.address ? (orderSample.address.split(',').pop().trim()) : 'Banjarmasin',
-        total: customerMap[name],
-        percentage: totalRevenue > 0 ? Math.round((customerMap[name] / totalRevenue) * 100) : 0
-      };
-    }).sort((a, b) => b.total - a.total).slice(0, 5);
-
-    const brandTotals = {};
-    monthlyOrders.forEach(o => {
-      if (o.items && Array.isArray(o.items)) {
-        o.items.forEach(item => {
-          const prod = products.find(p => p.name === item.name || p.id === item.id);
-          const brand = prod?.brand || 'Petronas';
-          const qty = Number(item.qty) || 0;
-          const price = Number(prod?.harga || item.harga || 400000);
-          brandTotals[brand] = (brandTotals[brand] || 0) + (qty * price);
-        });
-      }
-    });
-
-    const totalBrandSum = Object.values(brandTotals).reduce((sum, v) => sum + v, 0);
-    const brandBreakdown = Object.keys(brandTotals).map(brand => ({
-      brand,
-      total: brandTotals[brand],
-      percentage: totalBrandSum > 0 ? Math.round((brandTotals[brand] / totalBrandSum) * 100) : 0
-    })).sort((a, b) => b.total - a.total);
-
-    return {
-      totalRevenue,
-      totalDus,
-      avgOrder,
-      topCustomers,
-      brandBreakdown
-    };
-  };
-
   const fetchReport = (monthKey) => {
     setIsLoading(true);
     api.get(`/api/laporan-penjualan`, { params: { bulan: monthKey } })
@@ -121,9 +43,14 @@ export default function LaporanPenjualan() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat laporan dari API, gunakan fallback lokal:", err);
-        const localData = loadLocalLaporan(monthKey);
-        setReportData(localData);
+        console.error("Gagal memuat laporan dari API:", err);
+        setReportData({
+          totalRevenue: 0,
+          totalDus: 0,
+          avgOrder: 0,
+          topCustomers: [],
+          brandBreakdown: []
+        });
         setIsLoading(false);
       });
   };

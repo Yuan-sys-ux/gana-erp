@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { DollarSign, Calendar as CalendarIcon, AlertTriangle, Loader2 } from 'lucide-react';
 import api from '../utils/api';
-import { getOrders, getProducts } from '../utils/mockDb';
 
 export default function AgingSchedule() {
   const [isLoading, setIsLoading] = useState(true);
@@ -15,82 +14,6 @@ export default function AgingSchedule() {
     },
     table: []
   });
-
-  const loadLocalAging = () => {
-    const orders = getOrders();
-    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
-    const parseDueDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return new Date();
-      const day = parseInt(parts[0]);
-      const monthName = parts[1];
-      const year = parseInt(parts[2]);
-      const monthIdx = monthsId.indexOf(monthName);
-      return new Date(year, monthIdx, day);
-    };
-
-    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
-    const now = new Date(2026, 5, 12); // 12 June 2026
-
-    const customerMap = {};
-    unpaidOrders.forEach(o => {
-      if (!customerMap[o.customer]) {
-        customerMap[o.customer] = {
-          name: o.customer,
-          city: o.address ? o.address.split(',').pop().trim() : 'Banjarmasin',
-          current: 0,
-          d1_30: 0,
-          d31_60: 0,
-          d61_90: 0,
-          d91_180: 0,
-          d180_plus: 0,
-          total: 0
-        };
-      }
-
-      const dueDate = parseDueDate(o.dueDate);
-      const diffTime = now.getTime() - dueDate.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      const amt = Number(o.total || 0);
-
-      if (diffDays <= 0) {
-        customerMap[o.customer].current += amt;
-      } else if (diffDays <= 30) {
-        customerMap[o.customer].d1_30 += amt;
-      } else if (diffDays <= 60) {
-        customerMap[o.customer].d31_60 += amt;
-      } else if (diffDays <= 90) {
-        customerMap[o.customer].d61_90 += amt;
-      } else if (diffDays <= 180) {
-        customerMap[o.customer].d91_180 += amt;
-      } else {
-        customerMap[o.customer].d180_plus += amt;
-      }
-      customerMap[o.customer].total += amt;
-    });
-
-    const tableData = Object.values(customerMap).filter(c => c.total > 0);
-
-    let totalPiutang = 0;
-    let current30 = 0;
-    let d60_90 = 0;
-    let d180_plus = 0;
-
-    tableData.forEach(c => {
-      totalPiutang += c.total;
-      current30 += c.current + c.d1_30;
-      d60_90 += c.d31_60 + c.d61_90;
-      d180_plus += c.d91_180 + c.d180_plus;
-    });
-
-    return {
-      cards: { totalPiutang, current30, d60_90, d180_plus },
-      table: tableData
-    };
-  };
 
   const fetchAging = () => {
     setIsLoading(true);
@@ -105,9 +28,11 @@ export default function AgingSchedule() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat aging schedule dari API, gunakan fallback lokal:", err);
-        const localData = loadLocalAging();
-        setAgingData(localData);
+        console.error("Gagal memuat aging schedule dari API:", err);
+        setAgingData({
+          cards: { totalPiutang: 0, current30: 0, d60_90: 0, d180_plus: 0 },
+          table: []
+        });
         setIsLoading(false);
       });
   };

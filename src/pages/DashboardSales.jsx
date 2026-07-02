@@ -6,7 +6,6 @@ import { Link } from 'react-router-dom';
 import { targetService } from '../services/targetService';
 import { userService } from '../services/userService';
 import api from '../utils/api';
-import { getOrders } from '../utils/mockDb';
 
 export default function DashboardSales() {
   const [targetData, setTargetData] = useState(null);
@@ -21,11 +20,12 @@ export default function DashboardSales() {
         if (res.data && res.data.success && res.data.list) {
           processWarnings(res.data.list);
         } else {
-          fallbackLocalWarnings();
+          setWarnings([]);
         }
       })
-      .catch(() => {
-        fallbackLocalWarnings();
+      .catch((err) => {
+        console.error("Gagal load warnings dari API:", err);
+        setWarnings([]);
       });
   };
 
@@ -46,55 +46,7 @@ export default function DashboardSales() {
     setWarnings(active);
   };
 
-  const fallbackLocalWarnings = () => {
-    const orders = getOrders();
-    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
 
-    const parseDueDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return new Date();
-      const day = parseInt(parts[0]);
-      const monthName = parts[1];
-      const year = parseInt(parts[2]);
-      const monthIdx = monthsId.indexOf(monthName);
-      return new Date(year, monthIdx, day);
-    };
-
-    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
-    const now = new Date(2026, 5, 12); // 12 June 2026
-
-    const list = unpaidOrders.map(o => {
-      const dueDateObj = parseDueDate(o.dueDate);
-      const diffTime = dueDateObj.getTime() - now.getTime();
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-      let status = 'safe';
-      let days = diffDays;
-
-      if (diffDays < 0) {
-        status = 'overdue';
-        days = diffDays;
-      } else if (diffDays <= 7) {
-        status = 'warning';
-        days = diffDays;
-      } else {
-        status = 'safe';
-        days = diffDays;
-      }
-
-      return {
-        id: o.id_transaksi || o.invoiceId || `INV-${o.id}`,
-        customer: o.customer,
-        amount: Number(o.total || 0),
-        days,
-        status
-      };
-    });
-
-    const active = list.filter(item => item.days <= 7);
-    setWarnings(active);
-  };
 
   const fetchTarget = (salesId = null) => {
     setIsLoading(true);

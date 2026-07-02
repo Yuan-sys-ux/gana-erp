@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, Plus, Edit, Trash2, Package, X, Loader2, HelpCircle } from 'lucide-react';
 import { productService } from '../services/productService';
-import { getProducts, saveProducts } from '../utils/mockDb';
 
 export default function DataProduk() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,8 +22,8 @@ export default function DataProduk() {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error("Gagal memuat produk dari API, load lokal:", err);
-        setProducts(getProducts());
+        console.error("Gagal memuat produk dari API:", err);
+        setProducts([]);
         setIsLoading(false);
       });
   };
@@ -103,42 +102,8 @@ export default function DataProduk() {
         handleCloseModal();
       })
       .catch((err) => {
-        console.error("Gagal menyimpan produk ke API, simpan lokal:", err);
-        const localProducts = getProducts();
-        if (editingProduct) {
-          const updated = localProducts.map(p => p.id === editingProduct.id ? {
-            ...p,
-            brand: formData.brand,
-            name: formData.name,
-            sae: formData.sae,
-            kemasan: formData.kemasan,
-            kategori: formData.kategori,
-            harga: Number(formData.harga),
-            stokKarton: Number(formData.stokKarton),
-            stokLiter: Number(formData.stokLiter),
-            grade: formData.grade,
-            tipe_kendaraan: formData.tipe_kendaraan
-          } : p);
-          saveProducts(updated);
-        } else {
-          const newProd = {
-            id: `PRD-${Date.now()}`,
-            brand: formData.brand,
-            name: formData.name,
-            sae: formData.sae,
-            kemasan: formData.kemasan,
-            kategori: formData.kategori,
-            harga: Number(formData.harga),
-            stokKarton: Number(formData.stokKarton),
-            stokLiter: Number(formData.stokLiter),
-            grade: formData.grade,
-            tipe_kendaraan: formData.tipe_kendaraan
-          };
-          localProducts.unshift(newProd);
-          saveProducts(localProducts);
-        }
-        loadProducts();
-        handleCloseModal();
+        console.error("Gagal menyimpan produk ke API:", err);
+        setIsLoading(false);
       });
   };
 
@@ -157,11 +122,8 @@ export default function DataProduk() {
           setEditingProduct(null);
         })
         .catch((err) => {
-          console.error("Gagal menghapus produk dari API, hapus lokal:", err);
-          const localProducts = getProducts();
-          const filtered = localProducts.filter(p => p.id !== editingProduct.id);
-          saveProducts(filtered);
-          loadProducts();
+          console.error("Gagal menghapus produk dari API:", err);
+          setIsLoading(false);
           setIsDeleteModalOpen(false);
           setEditingProduct(null);
         });

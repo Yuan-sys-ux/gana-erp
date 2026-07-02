@@ -3,7 +3,6 @@ import StatCard from '../components/StatCard';
 import { AlertCircle, Package, TrendingUp, ClipboardCheck } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useState, useEffect } from 'react';
-import { getProducts, getIncomingStock } from '../utils/mockDb';
 import { productService } from '../services/productService';
 import { purchaseService } from '../services/purchaseService';
 
@@ -18,8 +17,8 @@ export default function DashboardKepalaGudang() {
         setProducts(data);
       })
       .catch(err => {
-        console.error("Gagal memuat produk dari API, load lokal:", err);
-        setProducts(getProducts());
+        console.error("Gagal memuat produk dari API:", err);
+        setProducts([]);
       });
 
     purchaseService.getAll()
@@ -27,8 +26,8 @@ export default function DashboardKepalaGudang() {
         setIncomingStock(res);
       })
       .catch(err => {
-        console.error("Gagal memuat incoming stock dari API, load lokal:", err);
-        setIncomingStock(getIncomingStock());
+        console.error("Gagal memuat incoming stock dari API:", err);
+        setIncomingStock([]);
       });
   }, []);
 

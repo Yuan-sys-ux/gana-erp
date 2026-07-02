@@ -2,7 +2,6 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import { History, Search, ArrowDownRight, ArrowUpRight, Filter, Download, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
-import { getStockHistory } from '../utils/mockDb';
 import { stockService } from '../services/stockService';
 
 export default function RiwayatStok() {
@@ -20,8 +19,8 @@ export default function RiwayatStok() {
         setStockHistory(res);
       })
       .catch(err => {
-        console.error("Gagal memuat riwayat stok dari API, gunakan mock lokal:", err);
-        setStockHistory(getStockHistory());
+        console.error("Gagal memuat riwayat stok dari API:", err);
+        setStockHistory([]);
       });
   };
 

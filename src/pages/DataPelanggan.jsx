@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, Plus, MapPin, Phone, Building2, Edit, X, Trash2, Loader2 } from 'lucide-react';
 import { customerService } from '../services/customerService';
-import { getCustomers, saveCustomers } from '../utils/mockDb';
 
 export default function DataPelanggan() {
   const [searchTerm, setSearchTerm] = useState('');
@@ -23,8 +22,8 @@ export default function DataPelanggan() {
         setIsLoading(false);
       })
       .catch((err) => {
-        console.error("Gagal memuat pelanggan dari API, load lokal:", err);
-        setCustomers(getCustomers());
+        console.error("Gagal memuat pelanggan dari API:", err);
+        setCustomers([]);
         setIsLoading(false);
       });
   };
@@ -106,37 +105,8 @@ export default function DataPelanggan() {
         handleCloseModal();
       })
       .catch((err) => {
-        console.error("Gagal menyimpan pelanggan ke API, simpan lokal:", err);
-        const localCustomers = getCustomers();
-        if (editingCustomer) {
-          const updated = localCustomers.map(c => c.id === editingCustomer.id ? {
-            ...c,
-            name: formData.name,
-            address: formData.address,
-            phone: formData.phone,
-            outstanding: Number(formData.outstanding),
-            city: formData.city,
-            status: formData.status,
-            password: formData.password
-          } : c);
-          saveCustomers(updated);
-        } else {
-          const newCust = {
-            id: `PLG-${Date.now()}`,
-            name: formData.name,
-            address: formData.address,
-            phone: formData.phone,
-            outstanding: Number(formData.outstanding),
-            lastOrder: '-',
-            status: formData.status,
-            city: formData.city,
-            password: formData.password
-          };
-          localCustomers.push(newCust);
-          saveCustomers(localCustomers);
-        }
-        loadCustomers();
-        handleCloseModal();
+        console.error("Gagal menyimpan pelanggan ke API:", err);
+        setIsLoading(false);
       });
   };
 
@@ -154,11 +124,8 @@ export default function DataPelanggan() {
           handleCloseModal();
         })
         .catch((err) => {
-          console.error("Gagal menghapus pelanggan dari API, hapus lokal:", err);
-          const localCustomers = getCustomers();
-          const filtered = localCustomers.filter(c => c.id !== editingCustomer.id);
-          saveCustomers(filtered);
-          loadCustomers();
+          console.error("Gagal menghapus pelanggan dari API:", err);
+          setIsLoading(false);
           setIsDeleteModalOpen(false);
           handleCloseModal();
         });

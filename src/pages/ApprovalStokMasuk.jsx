@@ -1,7 +1,6 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { ShieldCheck, XCircle, CheckCircle2, Clock, Search, ChevronDown, ChevronUp } from 'lucide-react';
 import { useState, useEffect } from 'react';
-import { getIncomingStock, updateIncomingStockStatus } from '../utils/mockDb';
 import { purchaseService } from '../services/purchaseService';
 
 export default function ApprovalStokMasuk() {
@@ -14,8 +13,8 @@ export default function ApprovalStokMasuk() {
         setApprovals(res);
       })
       .catch(err => {
-        console.error("Gagal load approvals dari API, fallback lokal:", err);
-        setApprovals(getIncomingStock());
+        console.error("Gagal load approvals dari API:", err);
+        setApprovals([]);
       });
   };
 
@@ -64,37 +63,21 @@ export default function ApprovalStokMasuk() {
   });
 
   const handleApprove = (id) => {
-    const dbId = id.replace('RCV-', '');
-    const isMock = isNaN(Number(dbId));
-    if (isMock) {
-      updateIncomingStockStatus(id, 'approved');
-      setApprovals(getIncomingStock());
-    } else {
-      purchaseService.update(id, { status: 'approved' })
-        .then(() => loadApprovals())
-        .catch(err => {
-          console.error("Gagal approve:", err);
-          updateIncomingStockStatus(id, 'approved');
-          loadApprovals();
-        });
-    }
+    purchaseService.update(id, { status: 'approved' })
+      .then(() => loadApprovals())
+      .catch(err => {
+        console.error("Gagal approve:", err);
+        alert("Gagal menyetujui penerimaan stok di database.");
+      });
   };
 
   const handleReject = (id) => {
-    const dbId = id.replace('RCV-', '');
-    const isMock = isNaN(Number(dbId));
-    if (isMock) {
-      updateIncomingStockStatus(id, 'rejected');
-      setApprovals(getIncomingStock());
-    } else {
-      purchaseService.update(id, { status: 'rejected' })
-        .then(() => loadApprovals())
-        .catch(err => {
-          console.error("Gagal reject:", err);
-          updateIncomingStockStatus(id, 'rejected');
-          loadApprovals();
-        });
-    }
+    purchaseService.update(id, { status: 'rejected' })
+      .then(() => loadApprovals())
+      .catch(err => {
+        console.error("Gagal reject:", err);
+        alert("Gagal menolak penerimaan stok di database.");
+      });
   };
 
   const toggleExpand = (id) => {

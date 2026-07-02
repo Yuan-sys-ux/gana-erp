@@ -1,23 +1,11 @@
 import DashboardLayout from '../layouts/DashboardLayout';
 import { PackagePlus, Save, Trash2, Search, CheckCircle2, AlertCircle, Edit2, X } from 'lucide-react';
 import { useState, useMemo, useEffect } from 'react';
-import { addIncomingStock } from '../utils/mockDb';
 import { purchaseService } from '../services/purchaseService';
 import { productService } from '../services/productService';
 
-const PRODUCTS = [
-  { id: 1, brand: 'Kixx', name: 'Kixx G1 5W-30' },
-  { id: 2, brand: 'Kixx', name: 'Kixx G1 10W-40' },
-  { id: 3, brand: 'Kixx', name: 'Kixx HD1 15W-40' },
-  { id: 4, brand: 'Kixx', name: 'Kixx PAO 5W-40' },
-  { id: 5, brand: 'Petronas', name: 'Syntium 5000 10W-40' },
-  { id: 6, brand: 'Petronas', name: 'Syntium 7000 0W-20' },
-  { id: 7, brand: 'Petronas', name: 'Urania 3000 15W-40' },
-  { id: 8, brand: 'Petronas', name: 'Syntium 3000 5W-40' },
-];
-
 export default function InputStokMasuk() {
-  const [products, setProducts] = useState(PRODUCTS);
+  const [products, setProducts] = useState([]);
   const [sjNumber, setSjNumber] = useState(() => localStorage.getItem('gana_incoming_stock_sj') || '');
   const [supplier, setSupplier] = useState(() => localStorage.getItem('gana_incoming_stock_supplier') || '');
   const [selectedProductId, setSelectedProductId] = useState('');
@@ -212,19 +200,12 @@ export default function InputStokMasuk() {
         setSearchProductTerm('');
       })
       .catch(err => {
-        console.error("Gagal menyimpan ke database, fallback lokal:", err);
-        addIncomingStock(receipt);
+        console.error("Gagal menyimpan ke database:", err);
         showAlert(
-          'success',
-          'Berhasil Dikirim!',
-          `Penerimaan barang dengan No. Surat Jalan "${sjNumber}" senilai total ${totalQty} Karton berhasil dikirim ke Kepala Gudang untuk disetujui.`
+          'error',
+          'Gagal!',
+          'Gagal mengirim penerimaan barang ke database backend.'
         );
-        setDraftItems([]);
-        setSjNumber('');
-        setSupplier('');
-        setSelectedProductId('');
-        setQty('');
-        setSearchProductTerm('');
       });
   };
 

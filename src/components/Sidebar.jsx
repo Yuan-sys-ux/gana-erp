@@ -98,6 +98,8 @@ export default function Sidebar({ isOpen, setIsOpen }) {
     e.preventDefault();
     localStorage.removeItem('userRole');
     localStorage.removeItem('userFullName');
+    localStorage.removeItem('userToken');
+    localStorage.removeItem('userId');
     navigate('/login');
   };
 

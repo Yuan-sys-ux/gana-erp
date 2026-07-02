@@ -4,7 +4,6 @@ import StatCard from '../components/StatCard';
 import { DollarSign, AlertTriangle, TrendingUp, Calendar, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../utils/api';
-import { getOrders, getProducts } from '../utils/mockDb';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 
 export default function DashboardOwner() {
@@ -41,112 +40,6 @@ export default function DashboardOwner() {
 
   const years = ['2024', '2025', '2026', '2027'];
 
-  const loadLocalDashboard = (targetMonth) => {
-    const orders = getOrders();
-    const products = getProducts();
-    const monthsId = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Ags', 'Sep', 'Okt', 'Nov', 'Des'];
-
-    const parseToMonthKey = (dateStr) => {
-      if (!dateStr) return '';
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return '';
-      const monthName = parts[1];
-      const year = parts[2];
-      const monthIdx = monthsId.indexOf(monthName);
-      if (monthIdx === -1) return '';
-      const monthStr = String(monthIdx + 1).padStart(2, '0');
-      return `${year}-${monthStr}`;
-    };
-
-    if (targetMonth > '2026-06') {
-      return {
-        stats: { totalPiutang: 0, piutangJatuhTempo: 0, countBengkelJatuhTempo: 0, salesMTD: 0, purchaseMTD: 0 },
-        chartData: [],
-        topReceivables: []
-      };
-    }
-
-    const unpaidOrders = orders.filter(o => o.paymentMethod === 'Tempo' && o.statusBayar !== 'Lunas');
-    const totalPiutang = unpaidOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-
-    const parseDueDate = (dateStr) => {
-      if (!dateStr) return new Date();
-      const parts = dateStr.split(' ');
-      if (parts.length < 3) return new Date();
-      const day = parseInt(parts[0]);
-      const monthName = parts[1];
-      const year = parseInt(parts[2]);
-      const monthIdx = monthsId.indexOf(monthName);
-      return new Date(year, monthIdx, day);
-    };
-
-    const mockCurrentDate = new Date(2026, 5, 12);
-    const overdueOrders = unpaidOrders.filter(o => {
-      const d = parseDueDate(o.dueDate);
-      return d < mockCurrentDate;
-    });
-
-    const piutangJatuhTempo = overdueOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const countBengkelJatuhTempo = new Set(overdueOrders.map(o => o.customer)).size;
-
-    const monthlyOrders = orders.filter(o => parseToMonthKey(o.date) === targetMonth);
-    const salesMTD = monthlyOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-    const purchaseMTD = salesMTD * 0.7;
-
-    const chartData = [];
-    const [year, month] = targetMonth.split('-').map(Number);
-    for (let i = 3; i >= 0; i--) {
-      const d = new Date(year, month - 1 - i, 1);
-      const mStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
-      const label = `${monthsId[d.getMonth()]} ${d.getFullYear()}`;
-      
-      const mOrders = orders.filter(o => parseToMonthKey(o.date) === mStr);
-      const sVal = mOrders.reduce((sum, o) => sum + Number(o.total || 0), 0);
-      const pVal = sVal * 0.7;
-
-      chartData.push({
-        month: mStr,
-        label,
-        sales: sVal,
-        purchase: pVal
-      });
-    }
-
-    const customerMap = {};
-    unpaidOrders.forEach(o => {
-      customerMap[o.customer] = (customerMap[o.customer] || 0) + Number(o.total || 0);
-    });
-
-    const topReceivables = Object.keys(customerMap).map(name => {
-      const custOrders = overdueOrders.filter(o => o.customer === name);
-      let maxDays = 0;
-      if (custOrders.length > 0) {
-        const diffs = custOrders.map(o => {
-          const d = parseDueDate(o.dueDate);
-          return Math.ceil((mockCurrentDate.getTime() - d.getTime()) / (1000 * 60 * 60 * 24));
-        });
-        maxDays = Math.max(...diffs);
-      }
-
-      let color = 'bg-[#22C55E]';
-      if (maxDays > 30) color = 'bg-[#F59E0B]';
-      if (maxDays > 60) color = 'bg-[#EF4444]';
-
-      return {
-        customer: name,
-        outstanding: customerMap[name],
-        overdueText: maxDays > 0 ? `${maxDays} hari` : '0 hari',
-        color
-      };
-    }).sort((a, b) => b.outstanding - a.outstanding).slice(0, 5);
-
-    return {
-      stats: { totalPiutang, piutangJatuhTempo, countBengkelJatuhTempo, salesMTD, purchaseMTD },
-      chartData,
-      topReceivables
-    };
-  };
-
   const fetchDashboard = (monthKey) => {
     setIsLoading(true);
     api.get('/api/owner/dashboard', { params: { bulan: monthKey } })
@@ -161,9 +54,12 @@ export default function DashboardOwner() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat dashboard dari API, gunakan fallback lokal:", err);
-        const localData = loadLocalDashboard(monthKey);
-        setDashboardData(localData);
+        console.error("Gagal memuat dashboard dari API:", err);
+        setDashboardData({
+          stats: { totalPiutang: 0, piutangJatuhTempo: 0, countBengkelJatuhTempo: 0, salesMTD: 0, purchaseMTD: 0 },
+          chartData: [],
+          topReceivables: []
+        });
         setIsLoading(false);
       });
   };

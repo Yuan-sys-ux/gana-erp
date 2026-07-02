@@ -3,7 +3,6 @@ import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
 import { Truck, CheckCircle2, Package, ClipboardList, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { getOrders } from '../utils/mockDb';
 import { orderService } from '../services/orderService';
 
 export default function DashboardStaffGudang() {
@@ -25,10 +24,9 @@ export default function DashboardStaffGudang() {
         setShippedCount(mapped.filter(o => o.status === 'Shipped' || o.status === 'Delivered').length);
       })
       .catch(err => {
-        console.error("Gagal load orders dari API di staff gudang, load lokal:", err);
-        const orders = getOrders();
-        setPendingOrders(orders.filter(o => o.status === 'Approved'));
-        setShippedCount(orders.filter(o => o.status === 'Shipped' || o.status === 'Delivered').length);
+        console.error("Gagal load orders dari API di staff gudang:", err);
+        setPendingOrders([]);
+        setShippedCount(0);
       });
   }, []);
 
