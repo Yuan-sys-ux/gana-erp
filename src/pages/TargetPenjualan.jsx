@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Target, TrendingUp, Calendar, Package, Loader2, Plus, Trash, AlertCircle, Check } from 'lucide-react';
+import { Target, TrendingUp, Package, Loader2, Plus, Trash, AlertCircle, Check } from 'lucide-react';
 import { targetService } from '../services/targetService';
 import { userService } from '../services/userService';
 import { productService } from '../services/productService';

@@ -1,5 +1,5 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { History, Search, ArrowDownRight, ArrowUpRight, Filter, Download, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
+import { Search, ArrowDownRight, ArrowUpRight, Download, ChevronUp, ChevronDown, ArrowUpDown } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { stockService } from '../services/stockService';

@@ -1,9 +1,8 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Truck, PackageOpen, CheckCircle2, MapPin, Search, Plus, X, AlertCircle, Printer } from 'lucide-react';
+import { Truck, PackageOpen, CheckCircle2, MapPin, Search, X, Printer } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { orderService } from '../services/orderService';
-import { productService } from '../services/productService';
 
 export default function PengirimanBarang() {
   const [deliveries, setDeliveries] = useState({ diproses: [], dikirim: [], terkirim: [] });
@@ -14,9 +13,6 @@ export default function PengirimanBarang() {
   const [selectedOrderId, setSelectedOrderId] = useState('');
   const [driverName, setDriverName] = useState('');
   const [plateNumber, setPlateNumber] = useState('');
-
-  // Custom Alert State
-  const [alert, setAlert] = useState({ isOpen: false, type: 'success', title: '', message: '' });
 
   // Product master and printing states
   const [products, setProducts] = useState([]);
@@ -84,63 +80,42 @@ export default function PengirimanBarang() {
   }, [location.search]);
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [currentPageDikirim, setCurrentPageDikirim] = useState(1);
+  const itemsPerPageDikirim = 6;
+  const [currentPageDiproses, setCurrentPageDiproses] = useState(1);
+  const itemsPerPageDiproses = 6;
 
   const filterBySearch = (arr) => arr.filter(item => 
     String(item.id).toLowerCase().includes(searchTerm.toLowerCase()) || 
     item.customer.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const [visibleSlots, setVisibleSlots] = useState([null, null, null, null, null, null]);
-
   const filteredDiproses = useMemo(() => {
     return filterBySearch(deliveries.diproses);
   }, [deliveries.diproses, searchTerm]);
 
+  const filteredDikirim = useMemo(() => {
+    return filterBySearch(deliveries.dikirim);
+  }, [deliveries.dikirim, searchTerm]);
+
   useEffect(() => {
-    const diprosesList = filteredDiproses;
-    
-    setVisibleSlots(prevSlots => {
-      // 1. Clean up slots: set to null if the item is no longer in diprosesList
-      let newSlots = prevSlots.map(slot => 
-        slot && diprosesList.some(item => item.id === slot.id) 
-          ? diprosesList.find(item => item.id === slot.id) 
-          : null
-      );
+    setCurrentPageDikirim(1);
+    setCurrentPageDiproses(1);
+  }, [searchTerm]);
 
-      const isInitial = prevSlots.every(s => s === null);
+  const paginatedDiproses = useMemo(() => {
+    const startIndex = (currentPageDiproses - 1) * itemsPerPageDiproses;
+    return filteredDiproses.slice(startIndex, startIndex + itemsPerPageDiproses);
+  }, [filteredDiproses, currentPageDiproses]);
 
-      // 2. Find candidates: items in diprosesList that are not in newSlots
-      let candidates = diprosesList.filter(item => 
-        !newSlots.some(slot => slot && slot.id === item.id)
-      );
+  const totalPagesDiproses = Math.ceil(filteredDiproses.length / itemsPerPageDiproses);
 
-      if (isInitial) {
-        // Initial load: fill from the front
-        for (let i = 0; i < 6; i++) {
-          if (candidates.length > 0) {
-            newSlots[i] = candidates.shift();
-          }
-        }
-      } else {
-        // Not initial load: fill empty slots by popping from the back of candidates
-        for (let i = 0; i < 6; i++) {
-          if (newSlots[i] === null && candidates.length > 0) {
-            newSlots[i] = candidates.pop();
-          }
-        }
-      }
+  const paginatedDikirim = useMemo(() => {
+    const startIndex = (currentPageDikirim - 1) * itemsPerPageDikirim;
+    return filteredDikirim.slice(startIndex, startIndex + itemsPerPageDikirim);
+  }, [filteredDikirim, currentPageDikirim]);
 
-      return newSlots;
-    });
-  }, [filteredDiproses]);
-
-  const activeVisibleItems = useMemo(() => {
-    return visibleSlots.filter(Boolean);
-  }, [visibleSlots]);
-
-  const excessCount = useMemo(() => {
-    return Math.max(0, filteredDiproses.length - activeVisibleItems.length);
-  }, [filteredDiproses, activeVisibleItems]);
+  const totalPagesDikirim = Math.ceil(filteredDikirim.length / itemsPerPageDikirim);
 
   const showAlert = (type, title, message) => {
     setAlert({ isOpen: true, type, title, message });
@@ -313,46 +288,64 @@ export default function PengirimanBarang() {
             </div>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 flex-1">
-              {activeVisibleItems.map((item) => (
-                <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] hover:border-[#CBD5E1] transition-all relative overflow-hidden flex flex-col justify-between">
-                  <div className="absolute top-0 left-0 w-1 h-full bg-[#94A3B8]"></div>
-                  <div>
-                    <div className="flex justify-between items-start mb-3">
-                      <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
-                      <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
-                    </div>
-                    <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
-                    <div className="flex items-start gap-1.5 text-[#64748B]">
-                      <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
-                      <p className="text-xs leading-relaxed">{item.address}</p>
-                    </div>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {paginatedDiproses.map((item) => (
+              <div key={item.id} className="bg-white p-5 rounded-xl shadow-sm border border-[#E2E8F0] hover:border-[#CBD5E1] transition-all relative overflow-hidden flex flex-col justify-between">
+                <div className="absolute top-0 left-0 w-1 h-full bg-[#94A3B8]"></div>
+                <div>
+                  <div className="flex justify-between items-start mb-3">
+                    <span className="text-xs font-bold text-[#4F46E5] bg-[#EEF2FF] px-2 py-1 rounded">{item.id}</span>
+                    <span className="text-[11px] font-bold text-[#64748B]">{item.qty} Dus</span>
                   </div>
-                  <button 
-                    onClick={() => handleOpenModal(item.id)}
-                    className="mt-4 w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-bold rounded-lg transition-colors"
-                  >
-                    Approve & Kirim
-                  </button>
+                  <h4 className="font-bold text-[#1E293B] mb-2">{item.customer}</h4>
+                  <div className="flex items-start gap-1.5 text-[#64748B]">
+                    <MapPin className="w-3.5 h-3.5 mt-0.5 shrink-0" />
+                    <p className="text-xs leading-relaxed">{item.address}</p>
+                  </div>
                 </div>
-              ))}
-              {activeVisibleItems.length === 0 && (
-                <div className="col-span-3 text-center py-8">
-                  <p className="text-xs text-[#94A3B8]">Tidak ada pengiriman dalam proses.</p>
-                </div>
-              )}
-            </div>
-
-            {excessCount > 0 && (
-              <div 
-                className="w-12 h-12 rounded-full bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5] flex items-center justify-center font-bold text-sm shrink-0 shadow-sm animate-pulse cursor-pointer hover:bg-[#E0E7FF] transition-all"
-                title={`${excessCount} pesanan lainnya sedang antre`}
-              >
-                +{excessCount}
+                <button 
+                  onClick={() => handleOpenModal(item.id)}
+                  className="mt-4 w-full py-2 bg-[#F1F5F9] hover:bg-[#E2E8F0] text-[#334155] text-xs font-bold rounded-lg transition-colors"
+                >
+                  Approve & Kirim
+                </button>
+              </div>
+            ))}
+            {filteredDiproses.length === 0 && (
+              <div className="col-span-3 text-center py-8">
+                <p className="text-xs text-[#94A3B8]">Tidak ada pengiriman dalam proses.</p>
               </div>
             )}
           </div>
+
+          {totalPagesDiproses > 1 && (
+            <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#E2E8F0]">
+              <span className="text-xs text-[#475569] font-semibold">
+                Menampilkan {paginatedDiproses.length} dari {filteredDiproses.length} barang sedang diproses
+              </span>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={() => setCurrentPageDiproses(prev => Math.max(prev - 1, 1))}
+                  disabled={currentPageDiproses === 1}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] text-[#475569] text-xs font-bold rounded-lg hover:bg-[#F1F5F9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Sebelumnya
+                </button>
+                <span className="px-3 py-1.5 text-xs font-bold text-[#475569]">
+                  {currentPageDiproses} / {totalPagesDiproses}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCurrentPageDiproses(prev => Math.min(prev + 1, totalPagesDiproses))}
+                  disabled={currentPageDiproses === totalPagesDiproses}
+                  className="px-3 py-1.5 bg-white border border-[#E2E8F0] text-[#475569] text-xs font-bold rounded-lg hover:bg-[#F1F5F9] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  Selanjutnya
+                </button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Section: Status Pengiriman (Bottom Board) */}
@@ -369,7 +362,7 @@ export default function PengirimanBarang() {
             </div>
             
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {filterBySearch(deliveries.dikirim).map((item) => (
+              {paginatedDikirim.map((item) => (
                 <div key={item.id} className="bg-white p-5 rounded-xl shadow-md border border-[#C7D2FE] relative overflow-hidden flex flex-col justify-between">
                   <div className="absolute top-0 left-0 w-1 h-full bg-[#4F46E5]"></div>
                   <div>
@@ -405,12 +398,39 @@ export default function PengirimanBarang() {
                   </div>
                 </div>
               ))}
-              {filterBySearch(deliveries.dikirim).length === 0 && (
+              {filteredDikirim.length === 0 && (
                 <div className="col-span-3 text-center py-8">
                   <p className="text-xs text-[#94A3B8]">Tidak ada armada pengiriman aktif.</p>
                 </div>
               )}
             </div>
+
+            {totalPagesDikirim > 1 && (
+              <div className="flex justify-between items-center mt-4 pt-4 border-t border-[#C7D2FE]">
+                <span className="text-xs text-[#1E40AF] font-semibold">
+                  Menampilkan {paginatedDikirim.length} dari {filteredDikirim.length} barang sedang dikirim
+                </span>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setCurrentPageDikirim(prev => Math.max(prev - 1, 1))}
+                    disabled={currentPageDikirim === 1}
+                    className="px-3 py-1.5 bg-white border border-[#C7D2FE] text-[#1E40AF] text-xs font-bold rounded-lg hover:bg-[#EEF2FF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Sebelumnya
+                  </button>
+                  <span className="px-3 py-1.5 text-xs font-bold text-[#1E40AF]">
+                    {currentPageDikirim} / {totalPagesDikirim}
+                  </span>
+                  <button
+                    onClick={() => setCurrentPageDikirim(prev => Math.min(prev + 1, totalPagesDikirim))}
+                    disabled={currentPageDikirim === totalPagesDikirim}
+                    className="px-3 py-1.5 bg-white border border-[#C7D2FE] text-[#1E40AF] text-xs font-bold rounded-lg hover:bg-[#EEF2FF] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Selanjutnya
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Section: Terkirim */}

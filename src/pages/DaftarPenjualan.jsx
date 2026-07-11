@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import * as XLSX from 'xlsx';
-import { Search, FileText, CheckCircle2, Clock, XCircle, ChevronDown, Download, Eye, Check, X, AlertCircle } from 'lucide-react';
+import { Search, FileText, CheckCircle2, Clock, XCircle, Download, Eye, Check, X } from 'lucide-react';
 import { orderService } from '../services/orderService';
 
 export default function DaftarPenjualan() {

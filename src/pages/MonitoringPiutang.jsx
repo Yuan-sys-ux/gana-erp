@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Search, AlertTriangle, CheckCircle2, Clock, Mail, Phone, DollarSign, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
+import { Search, AlertTriangle, CheckCircle2, Clock, DollarSign, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
 
 export default function MonitoringPiutang() {
@@ -9,6 +9,7 @@ export default function MonitoringPiutang() {
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState('Semua Status');
   const [confirmingItem, setConfirmingItem] = useState(null);
+  const [activeHighlightId, setActiveHighlightId] = useState(null);
   const [alertModal, setAlertModal] = useState({
     isOpen: false,
     type: 'success',
@@ -65,6 +66,27 @@ export default function MonitoringPiutang() {
     setRole(localStorage.getItem('userRole') || 'admin');
     fetchPiutang();
   }, []);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const highlightId = params.get('highlight');
+    if (highlightId && !isLoading) {
+      setTimeout(() => {
+        const element = document.getElementById(`row-${highlightId}`);
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          // Trigger the highlight animation 850ms after scroll starts (once row is centered in view)
+          setTimeout(() => {
+            setActiveHighlightId(highlightId);
+            // Auto-remove highlight class after the 3-second animation completes
+            setTimeout(() => {
+              setActiveHighlightId(null);
+            }, 3200);
+          }, 850);
+        }
+      }, 500);
+    }
+  }, [isLoading]);
 
   const filteredPiutang = useMemo(() => {
     return piutangData.list.filter(item => {
@@ -139,6 +161,21 @@ export default function MonitoringPiutang() {
 
   return (
     <DashboardLayout>
+      <style>{`
+        @keyframes highlight-pulse {
+          0% { 
+            background-color: rgba(254, 243, 199, 0.95); 
+            box-shadow: inset 0 0 0 2px #F59E0B;
+          }
+          100% { 
+            background-color: transparent; 
+            box-shadow: inset 0 0 0 0px transparent;
+          }
+        }
+        .row-highlighted {
+          animation: highlight-pulse 3s cubic-bezier(0.25, 1, 0.5, 1) forwards;
+        }
+      `}</style>
       <div className="flex flex-col gap-6 font-sans">
         
         {/* Header */}
@@ -248,53 +285,61 @@ export default function MonitoringPiutang() {
                     </tr>
                   </thead>
                   <tbody className="text-sm">
-                    {filteredPiutang.length > 0 ? filteredPiutang.map((item, idx) => (
-                      <tr key={idx} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
-                        <td className="py-4 px-6">
-                          <p className="font-bold text-[#1E293B]">{item.customer}</p>
-                          <p className="text-xs text-[#64748B]">{item.city}</p>
-                        </td>
-                        <td className="py-4 px-6 text-[#4F46E5] font-semibold text-xs">
-                          {item.id}
-                        </td>
-                        <td className="py-4 px-6 font-bold text-[#1E293B]">
-                          Rp {item.amount.toLocaleString('id-ID')}
-                        </td>
-                        <td className="py-4 px-6">
-                          <p className="font-semibold text-[#334155]">{item.dueDate}</p>
-                        </td>
-                        <td className="py-4 px-6">
-                          {item.status === 'overdue' && (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEE2E2] border border-[#FECACA] text-[#DC2626]">
-                              <AlertTriangle className="w-3 h-3" />
-                              <span className="text-[10px] font-bold">Telat {item.days} Hari</span>
-                            </div>
-                          )}
-                          {item.status === 'warning' && (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706]">
-                              <Clock className="w-3 h-3" />
-                              <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
-                            </div>
-                          )}
-                          {item.status === 'safe' && (
-                            <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DCFCE7] border border-[#BBF7D0] text-[#16A34A]">
-                              <CheckCircle2 className="w-3 h-3" />
-                              <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
-                            </div>
-                          )}
-                        </td>
-                        <td className="py-4 px-6 text-center">
-                          <button
-                            onClick={() => handleConfirmPayment(item)}
-                            className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 mx-auto"
-                            title="Konfirmasi Lunas"
-                          >
-                            <CheckCircle2 className="w-3.5 h-3.5" />
-                            <span>Konfirmasi Lunas</span>
-                          </button>
-                        </td>
-                      </tr>
-                    )) : (
+                    {filteredPiutang.length > 0 ? filteredPiutang.map((item, idx) => {
+                      const isHighlighted = activeHighlightId === item.id;
+
+                      return (
+                        <tr 
+                          key={idx} 
+                          id={`row-${item.id}`}
+                          className={`border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-all duration-300 ${isHighlighted ? 'row-highlighted bg-amber-50/60' : ''}`}
+                        >
+                          <td className="py-4 px-6">
+                            <p className="font-bold text-[#1E293B]">{item.customer}</p>
+                            <p className="text-xs text-[#64748B]">{item.city}</p>
+                          </td>
+                          <td className="py-4 px-6 text-[#4F46E5] font-semibold text-xs">
+                            {item.id}
+                          </td>
+                          <td className="py-4 px-6 font-bold text-[#1E293B]">
+                            Rp {item.amount.toLocaleString('id-ID')}
+                          </td>
+                          <td className="py-4 px-6">
+                            <p className="font-semibold text-[#334155]">{item.dueDate}</p>
+                          </td>
+                          <td className="py-4 px-6">
+                            {item.status === 'overdue' && (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEE2E2] border border-[#FECACA] text-[#DC2626]">
+                                <AlertTriangle className="w-3 h-3" />
+                                <span className="text-[10px] font-bold">Telat {item.days} Hari</span>
+                              </div>
+                            )}
+                            {item.status === 'warning' && (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FEF3C7] border border-[#FDE68A] text-[#D97706]">
+                                <Clock className="w-3 h-3" />
+                                <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
+                              </div>
+                            )}
+                            {item.status === 'safe' && (
+                              <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#DCFCE7] border border-[#BBF7D0] text-[#16A34A]">
+                                <CheckCircle2 className="w-3 h-3" />
+                                <span className="text-[10px] font-bold">Sisa {item.days} Hari</span>
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-4 px-6 text-center">
+                            <button
+                              onClick={() => handleConfirmPayment(item)}
+                              className="bg-[#10B981] hover:bg-[#059669] text-white px-3 py-1.5 rounded-lg text-xs font-semibold shadow-sm transition-colors flex items-center gap-1.5 mx-auto"
+                              title="Konfirmasi Lunas"
+                            >
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <span>Konfirmasi Lunas</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    }) : (
                       <tr>
                         <td colSpan="6" className="py-8 text-center text-[#64748B]">Tidak ada data piutang yang sesuai.</td>
                       </tr>

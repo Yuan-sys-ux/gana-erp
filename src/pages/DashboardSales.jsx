@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import StatCard from '../components/StatCard';
-import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award, AlertTriangle, Loader2, X } from 'lucide-react';
+import { Target, TrendingUp, MapPin, ShoppingCart, Camera, Check, Award, AlertTriangle, X } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { targetService } from '../services/targetService';
 import { userService } from '../services/userService';
@@ -117,35 +117,62 @@ export default function DashboardSales() {
         </div>
 
         {/* Right-aligned Warning Notification Bar */}
-        {warnings.length > 0 && (
-          <div className="fixed top-20 right-6 z-50 w-80 flex flex-col gap-3">
-            {warnings
-              .filter(w => !dismissedWarnings.includes(w.id))
-              .map(warn => {
-                const isUrgent = warn.days <= 3;
-                return (
-                  <div key={warn.id} className={`p-4 rounded-xl shadow-lg border relative overflow-hidden bg-white animate-in slide-in-from-right duration-300 ${isUrgent ? 'border-red-200' : 'border-amber-200'}`}>
-                    <div className={`absolute top-0 left-0 w-1.5 h-full ${isUrgent ? 'bg-[#DC2626]' : 'bg-[#EAB308]'}`}></div>
-                    <button onClick={() => setDismissedWarnings(prev => [...prev, warn.id])} className="absolute top-2.5 right-2.5 text-gray-400 hover:text-gray-600 transition-colors">
-                      <X className="w-4 h-4" />
-                    </button>
-                    <div className="flex gap-2.5 items-start">
-                      <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-[#DC2626] animate-pulse' : 'text-[#EAB308]'}`} />
-                      <div className="pr-5 flex-1">
-                        <h4 className={`font-bold text-xs ${isUrgent ? 'text-[#991B1B]' : 'text-[#854D0E]'}`}>Peringatan Jatuh Tempo!</h4>
-                        <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
-                          Bengkel <span className="font-bold">{warn.customer}</span> {warn.days < 0 ? `telah menunggak selama ${Math.abs(warn.days)} hari` : `jatuh tempo dalam ${warn.days} hari`} (Rp {warn.amount.toLocaleString('id-ID')}).
-                        </p>
-                        <div className="mt-2.5">
-                          <Link to="/monitoring-piutang" className={`inline-block px-3 py-1 rounded text-[10px] font-bold text-white transition-colors ${isUrgent ? 'bg-[#DC2626] hover:bg-[#B91C1C]' : 'bg-[#EAB308] hover:bg-[#CA8A04]'}`}>
-                            Lihat Detail
-                          </Link>
+        {warnings.filter(w => !dismissedWarnings.includes(w.id)).length > 0 && (
+          <div className="fixed top-20 right-6 z-50 w-80 max-h-[calc(100vh-120px)] overflow-y-auto pr-1 flex flex-col gap-3" style={{ scrollbarWidth: 'thin' }}>
+            {(() => {
+              const activeWarnings = warnings.filter(w => !dismissedWarnings.includes(w.id));
+              const displayWarnings = activeWarnings.slice(0, 3);
+              const remainingCount = activeWarnings.length - 3;
+              
+              return (
+                <>
+                  {displayWarnings.map(warn => {
+                    const isUrgent = warn.days <= 3;
+                    return (
+                      <div key={warn.id} className={`p-4 rounded-xl shadow-lg border relative overflow-hidden bg-white animate-in slide-in-from-right duration-300 ${isUrgent ? 'border-red-200' : 'border-amber-200'}`}>
+                        <div className={`absolute top-0 left-0 w-1.5 h-full ${isUrgent ? 'bg-[#DC2626]' : 'bg-[#EAB308]'}`}></div>
+                        <button onClick={() => setDismissedWarnings(prev => [...prev, warn.id])} className="absolute top-2.5 right-2.5 text-gray-400 hover:text-gray-600 transition-colors">
+                          <X className="w-4 h-4" />
+                        </button>
+                        <div className="flex gap-2.5 items-start">
+                          <AlertTriangle className={`w-5 h-5 shrink-0 mt-0.5 ${isUrgent ? 'text-[#DC2626] animate-pulse' : 'text-[#EAB308]'}`} />
+                          <div className="pr-5 flex-1">
+                            <h4 className={`font-bold text-xs ${isUrgent ? 'text-[#991B1B]' : 'text-[#854D0E]'}`}>Peringatan Jatuh Tempo!</h4>
+                            <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                              Bengkel <span className="font-bold">{warn.customer}</span> {warn.days < 0 ? `telah menunggak selama ${Math.abs(warn.days)} hari` : `jatuh tempo dalam ${warn.days} hari`} (Rp {warn.amount.toLocaleString('id-ID')}).
+                            </p>
+                            <div className="mt-2.5">
+                              <Link to={`/monitoring-piutang?highlight=${warn.id}`} className={`inline-block px-3 py-1 rounded text-[10px] font-bold text-white transition-colors ${isUrgent ? 'bg-[#DC2626] hover:bg-[#B91C1C]' : 'bg-[#EAB308] hover:bg-[#CA8A04]'}`}>
+                                Lihat Detail
+                              </Link>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {remainingCount > 0 && (
+                    <div className="p-4 rounded-xl shadow-lg border border-red-200 relative overflow-hidden bg-white flex flex-col gap-2 animate-in slide-in-from-right duration-300">
+                      <div className="absolute top-0 left-0 w-1.5 h-full bg-[#DC2626]"></div>
+                      <div className="flex gap-2.5 items-start">
+                        <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5 text-[#DC2626] animate-pulse" />
+                        <div className="pr-5 flex-1">
+                          <h4 className="font-bold text-xs text-[#991B1B]">Peringatan Tambahan</h4>
+                          <p className="text-[11px] text-gray-600 mt-1 leading-relaxed">
+                            Ada <span className="font-bold">{remainingCount}</span> bengkel lainnya yang juga menunggak atau mendekati jatuh tempo pembayaran.
+                          </p>
+                          <div className="mt-2.5">
+                            <Link to="/monitoring-piutang" className="inline-block px-3 py-1 rounded text-[10px] font-bold text-white bg-[#DC2626] hover:bg-[#B91C1C] transition-colors">
+                              Lihat Semua
+                            </Link>
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
 
