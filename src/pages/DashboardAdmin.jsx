@@ -57,14 +57,14 @@ export default function Dashboard() {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6">
-        
+
         {/* Title Section */}
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
           <div>
             <h2 className="text-xl font-bold text-[#1E293B]">Dashboard Admin</h2>
             <p className="text-xs text-[#64748B] mt-1">Ringkasan sistem dan manajemen data</p>
           </div>
-          
+
           {/* Month Selector */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-[#64748B]">Periode:</span>
@@ -93,48 +93,48 @@ export default function Dashboard() {
           <>
             {/* Stat Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard 
-                title="Total Penjualan Bulan Ini" 
-                value={`Rp ${stats.totalSales.toLocaleString('id-ID')}`} 
-                icon={<CircleDollarSign className="w-5 h-5" />} 
+              <StatCard
+                title="Total Penjualan Bulan Ini"
+                value={`Rp ${stats.totalSales.toLocaleString('id-ID')}`}
+                icon={<CircleDollarSign className="w-5 h-5" />}
                 bgClass="bg-[#22C55E]"
               />
-              <StatCard 
-                title="Tim Sales Aktif" 
-                value={stats.activeSalesCount.toString()} 
-                icon={<Users className="w-5 h-5" />} 
+              <StatCard
+                title="Tim Sales Aktif"
+                value={stats.activeSalesCount.toString()}
+                icon={<Users className="w-5 h-5" />}
                 bgClass="bg-[#3B82F6]"
               />
-              <StatCard 
-                title="Bengkel Terdaftar" 
-                value={stats.registeredCustomersCount.toString()} 
-                icon={<ShoppingCart className="w-5 h-5" />} 
+              <StatCard
+                title="Bengkel Terdaftar"
+                value={stats.registeredCustomersCount.toString()}
+                icon={<ShoppingCart className="w-5 h-5" />}
                 bgClass="bg-[#A855F7]"
               />
-              <StatCard 
-                title="Produk Aktif" 
-                value={stats.activeProductsCount.toString()} 
-                icon={<Package className="w-5 h-5" />} 
-                bgClass="bg-[#F97316]"
+              <StatCard
+                title="Produk Aktif"
+                value={stats.activeProductsCount.toString()}
+                icon={<Package className="w-5 h-5" />}
+                bgClass="bg-[#EF4444]"
               />
             </div>
 
             {/* Action Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <Link to="/data-produk" className="bg-[#2563EB] text-white p-6 rounded-xl shadow-sm hover:-translate-y-1 transition-transform block">
-                 <Package className="w-6 h-6 mb-4 opacity-90" />
-                 <h3 className="font-bold text-lg mb-1">Produk</h3>
-                 <p className="text-xs opacity-80">Kelola data oli Kixx & Petronas</p>
+                <Package className="w-6 h-6 mb-4 opacity-90" />
+                <h3 className="font-bold text-lg mb-1">Produk</h3>
+                <p className="text-xs opacity-80">Kelola data oli Kixx & Petronas</p>
               </Link>
               <Link to="/data-pelanggan" className="bg-[#A855F7] text-white p-6 rounded-xl shadow-sm hover:-translate-y-1 transition-transform block">
-                 <Users className="w-6 h-6 mb-4 opacity-90" />
-                 <h3 className="font-bold text-lg mb-1">Pelanggan</h3>
-                 <p className="text-xs opacity-80">Kelola data bengkel mitra</p>
+                <Users className="w-6 h-6 mb-4 opacity-90" />
+                <h3 className="font-bold text-lg mb-1">Pelanggan</h3>
+                <p className="text-xs opacity-80">Kelola data bengkel mitra</p>
               </Link>
               <Link to="/user-management" className="bg-[#F97316] text-white p-6 rounded-xl shadow-sm hover:-translate-y-1 transition-transform block">
-                 <UserCheck className="w-6 h-6 mb-4 opacity-90" />
-                 <h3 className="font-bold text-lg mb-1">Manajemen Pengguna</h3>
-                 <p className="text-xs opacity-80">Kelola hak akses pengguna</p>
+                <UserCheck className="w-6 h-6 mb-4 opacity-90" />
+                <h3 className="font-bold text-lg mb-1">Manajemen Pengguna</h3>
+                <p className="text-xs opacity-80">Kelola hak akses pengguna</p>
               </Link>
             </div>
 
@@ -163,11 +163,10 @@ export default function Dashboard() {
                           <td className="py-4 px-6 text-[#475569]">{tx.customer}</td>
                           <td className="py-4 px-6 font-semibold text-[#1E293B]">Rp {tx.total.toLocaleString('id-ID')}</td>
                           <td className="py-4 px-6">
-                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                              tx.statusBayar === 'Lunas' 
-                                ? 'bg-[#DCFCE7] text-[#16A34A]' 
+                            <span className={`px-3 py-1 rounded-full text-xs font-bold ${tx.statusBayar === 'Lunas'
+                                ? 'bg-[#DCFCE7] text-[#16A34A]'
                                 : 'bg-[#FEF3C7] text-[#D97706]'
-                            }`}>
+                              }`}>
                               {tx.statusBayar}
                             </span>
                           </td>

@@ -1,12 +1,16 @@
 import DashboardLayout from '../layouts/DashboardLayout';
-import { Truck, PackageOpen, CheckCircle2, MapPin, Search, X, Printer } from 'lucide-react';
+import { Truck, PackageOpen, CheckCircle2, MapPin, Search, X, Printer, AlertCircle, Plus } from 'lucide-react';
 import { useState, useEffect, useMemo } from 'react';
 import { useLocation } from 'react-router-dom';
 import { orderService } from '../services/orderService';
+import { productService } from '../services/productService';
 
 export default function PengirimanBarang() {
   const [deliveries, setDeliveries] = useState({ diproses: [], dikirim: [], terkirim: [] });
   const location = useLocation();
+  
+  // Custom Alert State
+  const [alert, setAlert] = useState({ isOpen: false, type: 'success', title: '', message: '' });
   
   // Modal States
   const [isModalOpen, setIsModalOpen] = useState(false);

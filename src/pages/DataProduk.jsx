@@ -222,6 +222,8 @@ export default function DataProduk() {
               <option value="Semua Kategori">Semua Kategori</option>
               <option value="Gasoline">Gasoline</option>
               <option value="Diesel">Diesel</option>
+              <option value="Transmission">Transmission</option>
+              <option value="Hybrid">Hybrid</option>
               <option value="Synthetic">Synthetic</option>
               <option value="Fully Synthetic">Fully Synthetic</option>
               <option value="Semi Synthetic">Semi Synthetic</option>
@@ -230,17 +232,17 @@ export default function DataProduk() {
 
           {/* Table */}
           <div className="overflow-x-auto">
-            <table className="w-full text-left whitespace-nowrap">
+            <table className="w-full text-left">
               <thead>
-                <tr className="bg-white text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider border-b border-t border-[#E2E8F0]">
-                  <th className="py-4 px-6">BRAND</th>
-                  <th className="py-4 px-6">NAMA PRODUK</th>
-                  <th className="py-4 px-6">SAE</th>
-                  <th className="py-4 px-6">KEMASAN</th>
-                  <th className="py-4 px-6">KATEGORI</th>
-                  <th className="py-4 px-6">STOK (KARTON)</th>
-                  <th className="py-4 px-6">HET</th>
-                  <th className="py-4 px-6 text-center">AKSI</th>
+                <tr className="bg-white text-[11px] font-bold text-[#94A3B8] uppercase tracking-wider border-b border-t border-[#E2E8F0] whitespace-nowrap">
+                  <th className="py-4 pl-5 pr-3">BRAND</th>
+                  <th className="py-4 px-3">NAMA PRODUK</th>
+                  <th className="py-4 px-3">SAE</th>
+                  <th className="py-4 px-3">KEMASAN</th>
+                  <th className="py-4 px-3">KATEGORI</th>
+                  <th className="py-4 px-3">STOK (KARTON)</th>
+                  <th className="py-4 px-3">HET</th>
+                  <th className="py-4 pl-3 pr-5 text-center">AKSI</th>
                 </tr>
               </thead>
               <tbody className="text-sm">
@@ -262,7 +264,7 @@ export default function DataProduk() {
                 ) : (
                   filteredProducts.map((product) => (
                     <tr key={product.id} className="border-b border-[#E2E8F0] hover:bg-gray-50/50 transition-colors">
-                      <td className="py-4 px-6">
+                      <td className="py-4 pl-5 pr-3 whitespace-nowrap">
                         <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
                           product.brand === 'Kixx' 
                             ? 'bg-[#FEE2E2] text-[#DC2626]' 
@@ -271,24 +273,24 @@ export default function DataProduk() {
                           {product.brand}
                         </span>
                       </td>
-                      <td className="py-4 px-6 text-[#1E293B] font-bold">
+                      <td className="py-4 px-3 text-[#1E293B] font-bold min-w-[180px] break-words">
                         <div className="flex flex-col">
                           <span>{product.name || product.nama}</span>
                           {product.grade && <span className="text-xs text-[#64748B] font-normal mt-0.5">Grade: {product.grade}</span>}
                           {product.tipe_kendaraan && <span className="text-xs text-[#94A3B8] font-normal">Tipe: {product.tipe_kendaraan}</span>}
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-[#64748B]">{product.sae}</td>
-                      <td className="py-4 px-6 text-[#64748B]">{product.kemasan}</td>
-                      <td className="py-4 px-6 text-[#64748B]">{product.kategori}</td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-3 text-[#64748B] whitespace-nowrap">{product.sae}</td>
+                      <td className="py-4 px-3 text-[#64748B] whitespace-nowrap">{product.kemasan}</td>
+                      <td className="py-4 px-3 text-[#64748B] whitespace-nowrap">{product.kategori}</td>
+                      <td className="py-4 px-3 whitespace-nowrap">
                         <div className="flex flex-col">
                           <span className="font-bold text-[#1E293B]">{product.stokKarton} Karton</span>
                           <span className="text-xs text-[#94A3B8]">({product.stokLiter} L)</span>
                         </div>
                       </td>
-                      <td className="py-4 px-6 text-[#1E293B] font-bold">Rp {Number(product.harga).toLocaleString('id-ID')}</td>
-                      <td className="py-4 px-6">
+                      <td className="py-4 px-3 text-[#1E293B] font-bold whitespace-nowrap">Rp {Number(product.harga).toLocaleString('id-ID')}</td>
+                      <td className="py-4 pl-3 pr-5 whitespace-nowrap">
                         <div className="flex items-center justify-center gap-3">
                           <button onClick={() => handleOpenModal(product)} className="text-[#0B56A6] hover:text-blue-800 transition-colors">
                             <Edit className="w-4 h-4" />
@@ -367,6 +369,8 @@ export default function DataProduk() {
                     value={formData.kategori} onChange={e => setFormData({...formData, kategori: e.target.value})} required>
                     <option value="Gasoline">Gasoline</option>
                     <option value="Diesel">Diesel</option>
+                    <option value="Transmission">Transmission</option>
+                    <option value="Hybrid">Hybrid</option>
                     <option value="Synthetic">Synthetic</option>
                     <option value="Fully Synthetic">Fully Synthetic</option>
                     <option value="Semi Synthetic">Semi Synthetic</option>

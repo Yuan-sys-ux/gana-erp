@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from 'react';
 import DashboardLayout from '../layouts/DashboardLayout';
 import { Search, AlertTriangle, CheckCircle2, Clock, DollarSign, FileSpreadsheet, Loader2, AlertCircle } from 'lucide-react';
 import api from '../utils/api';
+import * as mockDb from '../utils/mockDb';
 
 export default function MonitoringPiutang() {
   const [role, setRole] = useState('');
@@ -48,15 +49,11 @@ export default function MonitoringPiutang() {
         setIsLoading(false);
       })
       .catch(err => {
-        console.error("Gagal memuat monitoring piutang dari API:", err);
+        console.warn("Backend API offline. Menggunakan data lokal dari mockDb.");
+        const localPiutang = mockDb.getPiutangDataLocal();
         setPiutangData({
-          stats: {
-            totalPiutang: 0,
-            overduePiutang: 0,
-            countOverdue: 0,
-            warningPiutang: 0
-          },
-          list: []
+          stats: localPiutang.stats,
+          list: localPiutang.list
         });
         setIsLoading(false);
       });
@@ -153,8 +150,15 @@ export default function MonitoringPiutang() {
         setConfirmingItem(null);
       })
       .catch(err => {
-        console.error("Gagal update status bayar di API:", err);
-        showAlert('error', 'Gagal!', 'Gagal mengonfirmasi status bayar ke backend server.');
+        console.warn("Backend API offline. Melakukan update lokal di mockDb.");
+        const customers = mockDb.getCustomers();
+        const customerIndex = customers.findIndex(c => c.id === id);
+        if (customerIndex !== -1) {
+          customers[customerIndex].outstanding = 0;
+          mockDb.saveCustomers(customers);
+        }
+        showAlert('success', 'Pembayaran Lunas! (Lokal)', `Pembayaran invoice ${confirmingItem.id} berhasil dikonfirmasi lunas di penyimpanan lokal.`);
+        fetchPiutang();
         setConfirmingItem(null);
       });
   };

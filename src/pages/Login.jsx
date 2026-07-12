@@ -58,6 +58,40 @@ export default function Login() {
         navigate('/dashboard');
       })
       .catch((err) => {
+        // Coba offline mock login jika tidak ada response dari backend (misalnya saat dideploy ke static hosting)
+        if (!err.response) {
+          const u = username.toLowerCase();
+          const p = password;
+          
+          const validUsers = {
+            'admin1': { role: 'admin', nama: 'Admin Gana', id: '1' },
+            'owner1': { role: 'owner', nama: 'Owner Gana', id: '2' },
+            'sales1': { role: 'sales', nama: 'Sales Gana', id: '3' },
+            'staff1': { role: 'staff_gudang', nama: 'Staff Gudang Gana', id: '4' },
+            'kepala1': { role: 'kepala_gudang', nama: 'Kepala Gudang Gana', id: '5' },
+            'admin': { role: 'admin', nama: 'Admin Gana', id: '1' },
+            'owner': { role: 'owner', nama: 'Owner Gana', id: '2' },
+            'sales': { role: 'sales', nama: 'Sales Gana', id: '3' },
+            'staff': { role: 'staff_gudang', nama: 'Staff Gudang Gana', id: '4' },
+            'kepala': { role: 'kepala_gudang', nama: 'Kepala Gudang Gana', id: '5' }
+          };
+
+          // Tentukan password yang diharapkan: admin1 -> admin1123, admin -> admin123
+          const baseName = u.endsWith('1') ? u.slice(0, -1) : u;
+          const expectedPass = u.endsWith('1') ? `${baseName}1123` : `${baseName}123`;
+
+          if (validUsers[u] && p === expectedPass) {
+            const mockUser = validUsers[u];
+            localStorage.setItem('userRole', mockUser.role);
+            localStorage.setItem('userFullName', mockUser.nama);
+            localStorage.setItem('userToken', 'mock-jwt-token-for-static-hosting');
+            localStorage.setItem('userId', mockUser.id);
+            setIsLoading(false);
+            navigate('/dashboard');
+            return;
+          }
+        }
+
         setIsLoading(false);
         // Menampilkan pesan error dari backend jika ada, atau default error
         const errorMessage = err.response?.data?.message || 'Gagal terhubung ke server atau username/password salah!';
