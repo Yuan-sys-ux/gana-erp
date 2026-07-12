@@ -3,13 +3,13 @@ import { useState, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 
 export default function DashboardLayout({ children }) {
-  const [role, setRole] = useState(() => localStorage.getItem('userRole') || 'admin');
-  const [fullName, setFullName] = useState(() => localStorage.getItem('userFullName') || 'Admin');
+  const [role, setRole] = useState(() => sessionStorage.getItem('userRole') || 'admin');
+  const [fullName, setFullName] = useState(() => sessionStorage.getItem('userFullName') || 'Admin');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   useEffect(() => {
-    setRole(localStorage.getItem('userRole') || 'admin');
-    setFullName(localStorage.getItem('userFullName') || 'Admin');
+    setRole(sessionStorage.getItem('userRole') || 'admin');
+    setFullName(sessionStorage.getItem('userFullName') || 'Admin');
   }, []);
 
   let headerTitle = 'Admin - Central Control';

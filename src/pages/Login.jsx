@@ -41,17 +41,17 @@ export default function Login() {
         const { role, nama } = data;
 
         if (role) {
-          localStorage.setItem('userRole', role);
+          sessionStorage.setItem('userRole', role);
         }
         if (nama) {
-          localStorage.setItem('userFullName', nama);
+          sessionStorage.setItem('userFullName', nama);
         }
         if (token) {
-          localStorage.setItem('userToken', token);
+          sessionStorage.setItem('userToken', token);
         }
         const userId = data?.id || data?.id_sales || data?.userId || '';
         if (userId) {
-          localStorage.setItem('userId', userId);
+          sessionStorage.setItem('userId', userId);
         }
 
         setIsLoading(false);
@@ -82,10 +82,10 @@ export default function Login() {
 
           if (validUsers[u] && p === expectedPass) {
             const mockUser = validUsers[u];
-            localStorage.setItem('userRole', mockUser.role);
-            localStorage.setItem('userFullName', mockUser.nama);
-            localStorage.setItem('userToken', 'mock-jwt-token-for-static-hosting');
-            localStorage.setItem('userId', mockUser.id);
+            sessionStorage.setItem('userRole', mockUser.role);
+            sessionStorage.setItem('userFullName', mockUser.nama);
+            sessionStorage.setItem('userToken', 'mock-jwt-token-for-static-hosting');
+            sessionStorage.setItem('userId', mockUser.id);
             setIsLoading(false);
             navigate('/dashboard');
             return;

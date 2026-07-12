@@ -12,7 +12,8 @@ export default function InputPesanan() {
   const [activeFilter, setActiveFilter] = useState('Semua');
   const [cart, setCart] = useState([]);
   const [selectedBengkel, setSelectedBengkel] = useState('');
-  
+  const [diskon, setDiskon] = useState("");
+
   // State for Bengkel List
   const [bengkels, setBengkels] = useState([]);
   const [customersList, setCustomersList] = useState([]);
@@ -93,14 +94,14 @@ export default function InputPesanan() {
   const showAlert = (type, title, message) => {
     setAlertModal({ isOpen: true, type, title, message });
   };
-  
+
   const closeAlert = () => {
     setAlertModal({ ...alertModal, isOpen: false });
   };
 
   const handleAddBengkel = (e) => {
     e.preventDefault();
-    if(newCustomerForm.name.trim()) {
+    if (newCustomerForm.name.trim()) {
       const payload = {
         nama: newCustomerForm.name,
         alamat: newCustomerForm.address || '-',
@@ -172,7 +173,7 @@ export default function InputPesanan() {
       showAlert('error', 'Gagal', 'Keranjang order masih kosong!');
       return;
     }
-    
+
     const customerObj = customersList.find(c => (c.name || c.nama) === selectedBengkel);
     const customerId = customerObj ? customerObj.id : null;
 
@@ -205,7 +206,7 @@ export default function InputPesanan() {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6 relative">
-        
+
         <div>
           <h2 className="text-xl font-bold text-[#1E293B]">Formulir Pesanan Cepat</h2>
           <p className="text-sm text-[#64748B] mt-1">Input pesanan cepat untuk bengkel</p>
@@ -223,7 +224,7 @@ export default function InputPesanan() {
                 <p className="text-sm text-[#475569]">{alertModal.message}</p>
               </div>
               <div className="p-4 bg-white border-t border-[#E2E8F0]">
-                <button 
+                <button
                   onClick={closeAlert}
                   className={`w-full py-2.5 rounded-xl font-bold text-white transition-colors shadow-sm ${alertModal.type === 'success' ? 'bg-[#16A34A] hover:bg-[#15803D]' : 'bg-[#DC2626] hover:bg-[#B91C1C]'}`}
                 >
@@ -240,7 +241,7 @@ export default function InputPesanan() {
             Pilih Bengkel <span className="text-[#EF4444]">*</span>
           </label>
           <div className="flex flex-col sm:flex-row gap-3">
-            <select 
+            <select
               value={selectedBengkel}
               onChange={(e) => setSelectedBengkel(e.target.value)}
               className="flex-1 border border-[#E2E8F0] rounded-lg px-4 py-2.5 text-sm text-[#1E293B] focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
@@ -250,7 +251,7 @@ export default function InputPesanan() {
                 <option key={idx} value={bengkel}>{bengkel}</option>
               ))}
             </select>
-            <button 
+            <button
               onClick={() => setIsAddBengkelOpen(true)}
               className="flex items-center justify-center gap-2 px-4 py-2.5 bg-[#F1F5F9] text-[#4F46E5] rounded-lg font-bold text-sm hover:bg-[#E2E8F0] border border-[#CBD5E1] transition-colors whitespace-nowrap"
             >
@@ -272,22 +273,22 @@ export default function InputPesanan() {
               <form onSubmit={handleAddBengkel} className="p-5">
                 <div className="mb-3">
                   <label className="block text-xs font-bold text-[#1E293B] mb-2">Nama Bengkel <span className="text-[#EF4444]">*</span></label>
-                  <input 
-                    type="text" 
+                  <input
+                    type="text"
                     required
                     value={newCustomerForm.name}
-                    onChange={(e) => setNewCustomerForm({...newCustomerForm, name: e.target.value})}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, name: e.target.value })}
                     placeholder="Masukkan nama bengkel..."
                     className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                   />
                 </div>
                 <div className="mb-3">
                   <label className="block text-xs font-bold text-[#1E293B] mb-2">Alamat Lengkap <span className="text-[#EF4444]">*</span></label>
-                  <textarea 
+                  <textarea
                     required
                     rows="2"
                     value={newCustomerForm.address}
-                    onChange={(e) => setNewCustomerForm({...newCustomerForm, address: e.target.value})}
+                    onChange={(e) => setNewCustomerForm({ ...newCustomerForm, address: e.target.value })}
                     placeholder="Contoh: Jl. Ahmad Yani Km 5..."
                     className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5] resize-none"
                   ></textarea>
@@ -295,20 +296,20 @@ export default function InputPesanan() {
                 <div className="flex gap-3 mb-5">
                   <div className="flex-1">
                     <label className="block text-xs font-bold text-[#1E293B] mb-2">No. Telepon <span className="text-[#EF4444]">*</span></label>
-                    <input 
-                      type="text" 
+                    <input
+                      type="text"
                       required
                       value={newCustomerForm.phone}
-                      onChange={(e) => setNewCustomerForm({...newCustomerForm, phone: e.target.value.replace(/\D/g, '')})}
+                      onChange={(e) => setNewCustomerForm({ ...newCustomerForm, phone: e.target.value.replace(/\D/g, '') })}
                       placeholder="0812..."
                       className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                     />
                   </div>
                   <div className="flex-1">
                     <label className="block text-xs font-bold text-[#1E293B] mb-2">Kota</label>
-                    <select 
+                    <select
                       value={newCustomerForm.city}
-                      onChange={(e) => setNewCustomerForm({...newCustomerForm, city: e.target.value})}
+                      onChange={(e) => setNewCustomerForm({ ...newCustomerForm, city: e.target.value })}
                       className="w-full border border-[#E2E8F0] rounded-lg px-4 py-2 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
                     >
                       <option value="Banjarmasin">Banjarmasin</option>
@@ -318,14 +319,14 @@ export default function InputPesanan() {
                   </div>
                 </div>
                 <div className="flex justify-end gap-3">
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setIsAddBengkelOpen(false)}
                     className="px-4 py-2 bg-white border border-[#CBD5E1] text-[#64748B] rounded-lg font-bold text-sm hover:bg-[#F8FAFC]"
                   >
                     Batal
                   </button>
-                  <button 
+                  <button
                     type="submit"
                     className="px-4 py-2 bg-[#4F46E5] text-white rounded-lg font-bold text-sm hover:bg-[#4338CA]"
                   >
@@ -337,18 +338,29 @@ export default function InputPesanan() {
           </div>
         )}
 
+        {/* <div className="mt-4">
+              <label className="text-sm font-bold text-[#64748B]">Diskon (Rp):</label>
+              <input 
+                  type="number" 
+                  className="w-full border border-[#E2E8F0] rounded-lg p-2 mt-1 focus:outline-none focus:ring-2 focus:ring-blue-500" 
+                  placeholder="Masukkan jumlah diskon..." 
+                  value={diskon}
+                  onChange={(e) => setDiskon(e.target.value)} 
+              />
+          </div> */}
+
         <div className="flex flex-col lg:flex-row gap-6 items-start pb-10">
-          
+
           {/* Left Column: Products */}
           <div className="flex-1 flex flex-col gap-4">
-            
+
             {/* Search and Filters */}
             <div className="bg-white p-5 rounded-xl shadow-[0_2px_10px_-3px_rgba(0,0,0,0.05)] border border-[#E2E8F0] flex flex-col gap-4 sticky top-[80px] z-10">
               <div className="relative">
                 <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#94A3B8]" />
-                <input 
-                  type="text" 
-                  placeholder="Cari produk..." 
+                <input
+                  type="text"
+                  placeholder="Cari produk..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="w-full border border-[#E2E8F0] rounded-lg pl-10 pr-4 py-2.5 text-sm focus:outline-none focus:border-[#4F46E5] focus:ring-1 focus:ring-[#4F46E5]"
@@ -356,14 +368,13 @@ export default function InputPesanan() {
               </div>
               <div className="flex items-center gap-2">
                 {['Semua', 'Kixx', 'Petronas'].map(filter => (
-                  <button 
+                  <button
                     key={filter}
                     onClick={() => setActiveFilter(filter)}
-                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${
-                      activeFilter === filter 
-                        ? 'bg-[#4F46E5] text-white' 
-                        : 'bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]'
-                    }`}
+                    className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-colors ${activeFilter === filter
+                      ? 'bg-[#4F46E5] text-white'
+                      : 'bg-[#F1F5F9] text-[#64748B] hover:bg-[#E2E8F0]'
+                      }`}
                   >
                     {filter}
                   </button>
@@ -387,13 +398,13 @@ export default function InputPesanan() {
                         {p.grade && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#EEF2FF] border border-[#C7D2FE] text-[#4F46E5]">{p.grade}</span>}
                         {p.tipe_kendaraan && <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-[#F0FDF4] border border-[#BBF7D0] text-[#16A34A]">{p.tipe_kendaraan}</span>}
                       </div>
-                      
+
                       <div className="mt-auto mb-4">
                         <h3 className="text-lg font-bold text-[#1E293B]">{p.priceFormatted}</h3>
                         <p className="text-[11px] text-[#64748B]">Stok: {p.stock} dus</p>
                       </div>
 
-                      <button 
+                      <button
                         onClick={() => addToCart(p)}
                         className="w-full py-2.5 rounded-lg bg-[#F1F5F9] text-[#4F46E5] text-sm font-bold hover:bg-[#E0E7FF] transition-colors flex items-center justify-center gap-2"
                       >
@@ -420,7 +431,7 @@ export default function InputPesanan() {
               </div>
               <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs font-bold">{cart.length} item</span>
             </div>
-            
+
             <div className="max-h-[500px] overflow-y-auto">
               {cart.length > 0 ? (
                 <div className="flex flex-col">
@@ -461,37 +472,35 @@ export default function InputPesanan() {
             {/* Cart Footer */}
             {cart.length > 0 && (
               <div className="p-4 bg-[#F8FAFC] border-t border-[#E2E8F0] flex flex-col gap-4">
-                
+
                 {/* Metode Pembayaran */}
                 <div className="flex flex-col gap-2">
                   <label className="text-xs font-bold text-[#1E293B]">Metode Pembayaran</label>
                   <div className="flex gap-2">
-                    <button 
+                    <button
                       onClick={() => setPaymentMethod('cash')}
-                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
-                        paymentMethod === 'cash' 
-                          ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]' 
-                          : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
-                      }`}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${paymentMethod === 'cash'
+                        ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]'
+                        : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
+                        }`}
                     >
                       Tunai
                     </button>
-                    <button 
+                    <button
                       onClick={() => setPaymentMethod('tempo')}
-                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${
-                        paymentMethod === 'tempo' 
-                          ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]' 
-                          : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
-                      }`}
+                      className={`flex-1 py-2 text-xs font-bold rounded-lg border transition-colors ${paymentMethod === 'tempo'
+                        ? 'bg-[#EEF2FF] border-[#4F46E5] text-[#4F46E5]'
+                        : 'bg-white border-[#E2E8F0] text-[#64748B] hover:bg-gray-50'
+                        }`}
                     >
                       Tempo
                     </button>
                   </div>
-                  
+
                   {paymentMethod === 'tempo' && (
                     <div className="mt-2 flex items-center justify-between bg-white border border-[#E2E8F0] rounded-lg px-3 py-2">
                       <span className="text-xs font-semibold text-[#64748B]">Lama Tempo:</span>
-                      <select 
+                      <select
                         value={tempoDays}
                         onChange={(e) => setTempoDays(e.target.value)}
                         className="text-xs font-bold text-[#1E293B] border-none bg-transparent focus:outline-none focus:ring-0"
@@ -508,8 +517,8 @@ export default function InputPesanan() {
                   <span className="text-sm font-semibold text-[#64748B]">Total Belanja</span>
                   <span className="text-lg font-bold text-[#16A34A]">Rp {cartTotal.toLocaleString('id-ID')}</span>
                 </div>
-                
-                <button 
+
+                <button
                   onClick={handleCheckout}
                   className="w-full py-3 bg-[#16A34A] text-white rounded-lg font-bold hover:bg-[#15803D] transition-colors shadow-sm"
                 >

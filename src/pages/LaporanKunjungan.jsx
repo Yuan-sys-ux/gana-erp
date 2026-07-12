@@ -96,7 +96,7 @@ export default function LaporanKunjungan() {
     setModalErrorMsg('');
     
     const payload = {
-      sales_id: localStorage.getItem('userId') ? Number(localStorage.getItem('userId')) : null,
+      sales_id: sessionStorage.getItem('userId') ? Number(sessionStorage.getItem('userId')) : null,
       id_pelanggan: newVisit.id_pelanggan || null,
       pelanggan_id: newVisit.id_pelanggan || null,
       catatan: newVisit.description,

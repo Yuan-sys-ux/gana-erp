@@ -1,8 +1,8 @@
 import { Navigate } from 'react-router-dom';
 
 export function ProtectedRoute({ children, allowedRoles }) {
-  const userRole = localStorage.getItem('userRole');
-  const userToken = localStorage.getItem('userToken');
+  const userRole = sessionStorage.getItem('userRole');
+  const userToken = sessionStorage.getItem('userToken');
 
   if (!userToken || !userRole) {
     // Redirect to login if token or role is missing
@@ -18,8 +18,8 @@ export function ProtectedRoute({ children, allowedRoles }) {
 }
 
 export function PublicRoute({ children }) {
-  const userRole = localStorage.getItem('userRole');
-  const userToken = localStorage.getItem('userToken');
+  const userRole = sessionStorage.getItem('userRole');
+  const userToken = sessionStorage.getItem('userToken');
 
   if (userToken && userRole) {
     // Redirect to dashboard if already logged in

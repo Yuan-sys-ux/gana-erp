@@ -22,7 +22,7 @@ export const orderService = {
       console.warn("Backend API offline. Menggunakan data lokal dari mockDb.");
       mockDb.addOrder({
         customer: orderData.nama_bengkel || orderData.customer,
-        sales: localStorage.getItem('userFullName') || 'Sales Gana',
+        sales: sessionStorage.getItem('userFullName') || 'Sales Gana',
         total: orderData.total || 0,
         status: 'Draft',
         qty: orderData.qty || 0,

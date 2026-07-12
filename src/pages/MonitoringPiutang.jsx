@@ -60,7 +60,7 @@ export default function MonitoringPiutang() {
   };
 
   useEffect(() => {
-    setRole(localStorage.getItem('userRole') || 'admin');
+    setRole(sessionStorage.getItem('userRole') || 'admin');
     fetchPiutang();
   }, []);
 

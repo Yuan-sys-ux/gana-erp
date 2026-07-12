@@ -19,11 +19,11 @@ import {
 } from 'lucide-react';
 
 export default function Sidebar({ isOpen, setIsOpen }) {
-  const [role, setRole] = useState(() => localStorage.getItem('userRole') || 'admin');
+  const [role, setRole] = useState(() => sessionStorage.getItem('userRole') || 'admin');
   const navigate = useNavigate();
 
   useEffect(() => {
-    setRole(localStorage.getItem('userRole') || 'admin');
+    setRole(sessionStorage.getItem('userRole') || 'admin');
   }, []);
 
   const adminMenu = [
@@ -97,10 +97,10 @@ export default function Sidebar({ isOpen, setIsOpen }) {
 
   const handleLogout = (e) => {
     e.preventDefault();
-    localStorage.removeItem('userRole');
-    localStorage.removeItem('userFullName');
-    localStorage.removeItem('userToken');
-    localStorage.removeItem('userId');
+    sessionStorage.removeItem('userRole');
+    sessionStorage.removeItem('userFullName');
+    sessionStorage.removeItem('userToken');
+    sessionStorage.removeItem('userId');
     navigate('/login');
   };
 

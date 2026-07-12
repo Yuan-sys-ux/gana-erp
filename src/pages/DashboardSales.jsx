@@ -10,7 +10,7 @@ import api from '../utils/api';
 export default function DashboardSales() {
   const [targetData, setTargetData] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
-  const [salesName, setSalesName] = useState(() => localStorage.getItem('userFullName') || 'Sales');
+  const [salesName, setSalesName] = useState(() => sessionStorage.getItem('userFullName') || 'Sales');
   const [warnings, setWarnings] = useState([]);
   const [dismissedWarnings, setDismissedWarnings] = useState([]);
 
@@ -74,10 +74,10 @@ export default function DashboardSales() {
   };
 
   useEffect(() => {
-    setSalesName(localStorage.getItem('userFullName') || 'Sales');
+    setSalesName(sessionStorage.getItem('userFullName') || 'Sales');
     loadWarnings();
 
-    const userId = localStorage.getItem('userId');
+    const userId = sessionStorage.getItem('userId');
     if (userId && userId !== 'dummy-sales-id') {
       fetchTarget(userId);
     } else {
@@ -85,13 +85,13 @@ export default function DashboardSales() {
       userService.getSales()
         .then((res) => {
           const list = Array.isArray(res) ? res : (res?.data || res?.sales || []);
-          const currentName = localStorage.getItem('userFullName');
+          const currentName = sessionStorage.getItem('userFullName');
           const matched = list.find(s => 
             (s.nama || s.nama_sales || s.name || '').toLowerCase() === (currentName || '').toLowerCase()
           );
           if (matched) {
             const resolvedId = matched.id || matched.id_sales;
-            localStorage.setItem('userId', resolvedId);
+            sessionStorage.setItem('userId', resolvedId);
             fetchTarget(resolvedId);
           } else {
             fetchTarget();

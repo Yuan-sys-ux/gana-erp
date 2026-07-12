@@ -6,7 +6,7 @@ import { userService } from '../services/userService';
 import { productService } from '../services/productService';
 
 export default function TargetPenjualan() {
-  const [role] = useState(() => (localStorage.getItem('userRole') || 'sales').toLowerCase());
+  const [role] = useState(() => (sessionStorage.getItem('userRole') || 'sales').toLowerCase());
   
   // Selection states
   const [selectedMonth, setSelectedMonth] = useState(() => {
@@ -100,7 +100,7 @@ export default function TargetPenjualan() {
       fetchTargetData(params);
     } else {
       // For sales role
-      const userId = localStorage.getItem('userId');
+      const userId = sessionStorage.getItem('userId');
       if (userId && userId !== 'dummy-sales-id') {
         params.sales_id = userId;
         fetchTargetData(params);
@@ -109,13 +109,13 @@ export default function TargetPenjualan() {
         userService.getSales()
           .then((res) => {
             const list = Array.isArray(res) ? res : (res?.data || res?.sales || []);
-            const currentName = localStorage.getItem('userFullName');
+            const currentName = sessionStorage.getItem('userFullName');
             const matched = list.find(s => 
               (s.nama || s.nama_sales || s.name || '').toLowerCase() === (currentName || '').toLowerCase()
             );
             if (matched) {
               const resolvedId = matched.id || matched.id_sales;
-              localStorage.setItem('userId', resolvedId);
+              sessionStorage.setItem('userId', resolvedId);
               params.sales_id = resolvedId;
               fetchTargetData(params);
             } else {
